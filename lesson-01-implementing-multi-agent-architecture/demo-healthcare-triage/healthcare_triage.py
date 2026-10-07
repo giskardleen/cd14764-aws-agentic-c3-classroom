@@ -43,11 +43,12 @@ Tech Stack:
 """
 
 import json
+import logging
 import os
 import re
 import time
-import logging
 from datetime import datetime
+
 from dotenv import load_dotenv
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -71,47 +72,71 @@ PATIENT_COMPLAINTS = [
         "patient_id": "P-1001",
         "name": "Alice Johnson",
         "complaint": "I've been having sharp chest pain for the past 2 hours, "
-                     "along with shortness of breath and dizziness.",
+        "along with shortness of breath and dizziness.",
         "age": 58,
     },
     {
         "patient_id": "P-1002",
         "name": "Bob Smith",
         "complaint": "I have a mild headache and a runny nose that started yesterday. "
-                     "No fever.",
+        "No fever.",
         "age": 32,
     },
     {
         "patient_id": "P-1003",
         "name": "Carol Davis",
         "complaint": "My ankle is swollen and painful after I twisted it while jogging "
-                     "this morning. I can still put some weight on it.",
+        "this morning. I can still put some weight on it.",
         "age": 27,
     },
 ]
 
 AVAILABLE_SLOTS = {
-    "urgent":   ["09:00 AM (Emergency)", "09:15 AM (Emergency)"],
+    "urgent": ["09:00 AM (Emergency)", "09:15 AM (Emergency)"],
     "standard": ["10:30 AM", "11:00 AM", "11:30 AM"],
-    "routine":  ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"],
+    "routine": ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"],
 }
 
 # ─────────────────────────────────────────────────────
 # SYMPTOM KNOWLEDGE BASE (simulated)
 # ─────────────────────────────────────────────────────
 SYMPTOM_CONDITIONS = {
-    "chest pain":          {"condition": "Possible cardiac event", "severity": "high",   "keywords": ["chest pain", "chest"]},
-    "shortness of breath": {"condition": "Respiratory distress",   "severity": "high",   "keywords": ["shortness of breath", "breathing", "breath"]},
-    "dizziness":           {"condition": "Circulatory issue",      "severity": "medium", "keywords": ["dizziness", "dizzy", "lightheaded"]},
-    "headache":            {"condition": "Tension headache",       "severity": "low",    "keywords": ["headache", "head pain"]},
-    "runny nose":          {"condition": "Upper respiratory infection", "severity": "low", "keywords": ["runny nose", "congestion", "nasal"]},
-    "swollen ankle":       {"condition": "Possible sprain",        "severity": "medium", "keywords": ["swollen", "ankle", "twisted", "sprain"]},
+    "chest pain": {
+        "condition": "Possible cardiac event",
+        "severity": "high",
+        "keywords": ["chest pain", "chest"],
+    },
+    "shortness of breath": {
+        "condition": "Respiratory distress",
+        "severity": "high",
+        "keywords": ["shortness of breath", "breathing", "breath"],
+    },
+    "dizziness": {
+        "condition": "Circulatory issue",
+        "severity": "medium",
+        "keywords": ["dizziness", "dizzy", "lightheaded"],
+    },
+    "headache": {
+        "condition": "Tension headache",
+        "severity": "low",
+        "keywords": ["headache", "head pain"],
+    },
+    "runny nose": {
+        "condition": "Upper respiratory infection",
+        "severity": "low",
+        "keywords": ["runny nose", "congestion", "nasal"],
+    },
+    "swollen ankle": {
+        "condition": "Possible sprain",
+        "severity": "medium",
+        "keywords": ["swollen", "ankle", "twisted", "sprain"],
+    },
 }
 
 
 def clean_response(text: str) -> str:
     """Strip Nova/Claude thinking tags from agent responses."""
-    cleaned = re.sub(r'<thinking>.*?</thinking>', '', str(text), flags=re.DOTALL)
+    cleaned = re.sub(r"<thinking>.*?</thinking>", "", str(text), flags=re.DOTALL)
     return cleaned.strip()
 
 
@@ -133,11 +158,15 @@ def run_agent_with_retry(agent_builder, prompt: str, max_retries: int = 3) -> st
             return clean_response(result)
         except Exception as e:
             if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s...")
+                wait = 2**attempt
+                print(
+                    f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s..."
+                )
                 time.sleep(wait)
             else:
-                print(f"    [Failed] {e.__class__.__name__} after {max_retries} attempts")
+                print(
+                    f"    [Failed] {e.__class__.__name__} after {max_retries} attempts"
+                )
                 raise
 
 
@@ -145,6 +174,7 @@ def run_agent_with_retry(agent_builder, prompt: str, max_retries: int = 3) -> st
 #  STEP 1: SYMPTOM ANALYZER AGENT
 #  Single responsibility: map complaint text → conditions
 # ═══════════════════════════════════════════════════════
+
 
 def build_symptom_analyzer() -> Agent:
     """Build the Symptom Analyzer agent with a lookup_symptoms tool."""
@@ -169,15 +199,20 @@ def build_symptom_analyzer() -> Agent:
         matches = []
         for symptom, info in SYMPTOM_CONDITIONS.items():
             if any(kw in complaint_lower for kw in info["keywords"]):
-                matches.append({
-                    "symptom": symptom,
-                    "condition": info["condition"],
-                    "severity": info["severity"],
-                })
-        result = json.dumps({
-            "matched_symptoms": matches,
-            "total_matches": len(matches),
-        }, indent=2)
+                matches.append(
+                    {
+                        "symptom": symptom,
+                        "condition": info["condition"],
+                        "severity": info["severity"],
+                    }
+                )
+        result = json.dumps(
+            {
+                "matched_symptoms": matches,
+                "total_matches": len(matches),
+            },
+            indent=2,
+        )
         _tool_results["symptoms"] = result  # Capture for coordinator
         return result
 
@@ -196,6 +231,7 @@ After the tool returns, output ONLY the raw JSON result. Do not classify urgency
 #  STEP 2: URGENCY CLASSIFIER AGENT
 #  Single responsibility: map symptom data → urgency level
 # ═══════════════════════════════════════════════════════
+
 
 def build_urgency_classifier() -> Agent:
     """Build the Urgency Classifier agent with a classify_urgency tool."""
@@ -247,11 +283,14 @@ def build_urgency_classifier() -> Agent:
             urgency = "routine"
             reason = "Low-severity symptoms — suitable for routine appointment"
 
-        result = json.dumps({
-            "urgency": urgency,
-            "reason": reason,
-            "severity_breakdown": severities,
-        }, indent=2)
+        result = json.dumps(
+            {
+                "urgency": urgency,
+                "reason": reason,
+                "severity_breakdown": severities,
+            },
+            indent=2,
+        )
         _tool_results["urgency"] = result  # Capture for coordinator
         return result
 
@@ -270,6 +309,7 @@ After the tool returns, output ONLY the raw JSON result. Do not analyze symptoms
 #  STEP 3: APPOINTMENT SCHEDULER AGENT
 #  Single responsibility: map urgency level → time slot
 # ═══════════════════════════════════════════════════════
+
 
 def build_appointment_scheduler() -> Agent:
     """Build the Appointment Scheduler agent with a book_appointment tool."""
@@ -294,24 +334,29 @@ def build_appointment_scheduler() -> Agent:
         urgency_key = urgency_level.lower().strip()
         slots = AVAILABLE_SLOTS.get(urgency_key, AVAILABLE_SLOTS["routine"])
         if not slots:
-            return json.dumps({
-                "status": "no_availability",
-                "message": f"No {urgency_key} slots available.",
-            })
+            return json.dumps(
+                {
+                    "status": "no_availability",
+                    "message": f"No {urgency_key} slots available.",
+                }
+            )
         assigned_slot = slots[0]
         today = datetime.now().strftime("%Y-%m-%d")
-        result = json.dumps({
-            "status": "booked",
-            "patient_id": patient_id,
-            "date": today,
-            "time_slot": assigned_slot,
-            "urgency": urgency_key,
-            "instructions": {
-                "urgent": "Proceed to emergency intake immediately.",
-                "standard": "Please arrive 15 minutes early for intake.",
-                "routine": "Please arrive 10 minutes before your appointment.",
-            }.get(urgency_key, "Please arrive on time."),
-        }, indent=2)
+        result = json.dumps(
+            {
+                "status": "booked",
+                "patient_id": patient_id,
+                "date": today,
+                "time_slot": assigned_slot,
+                "urgency": urgency_key,
+                "instructions": {
+                    "urgent": "Proceed to emergency intake immediately.",
+                    "standard": "Please arrive 15 minutes early for intake.",
+                    "routine": "Please arrive 10 minutes before your appointment.",
+                }.get(urgency_key, "Please arrive on time."),
+            },
+            indent=2,
+        )
         _tool_results["booking"] = result  # Capture for coordinator
         return result
 
@@ -331,6 +376,7 @@ After the tool returns, output ONLY the raw JSON result. Do not analyze symptoms
 #  Calls each agent in sequence, passing outputs forward
 # ═══════════════════════════════════════════════════════
 
+
 def run_triage_pipeline(patient: dict) -> dict:
     """Run the 3-agent triage pipeline for a single patient.
 
@@ -344,8 +390,7 @@ def run_triage_pipeline(patient: dict) -> dict:
     print("    [1/3] Symptom Analyzer...")
     _tool_results.clear()  # Reset between patients to avoid stale data
     run_agent_with_retry(
-        build_symptom_analyzer,
-        f"Analyze these symptoms: {patient['complaint']}"
+        build_symptom_analyzer, f"Analyze these symptoms: {patient['complaint']}"
     )
     # Use captured tool result (reliable) instead of parsing LLM text (fragile)
     symptom_json = json.loads(_tool_results.get("symptoms", '{"total_matches": 0}'))
@@ -356,7 +401,7 @@ def run_triage_pipeline(patient: dict) -> dict:
     print("    [2/3] Urgency Classifier...")
     run_agent_with_retry(
         build_urgency_classifier,
-        f"Classify urgency for this symptom analysis: {symptom_str}"
+        f"Classify urgency for this symptom analysis: {symptom_str}",
     )
     urgency_json = json.loads(_tool_results.get("urgency", '{"urgency": "routine"}'))
     urgency_level = urgency_json.get("urgency", "routine")
@@ -366,7 +411,7 @@ def run_triage_pipeline(patient: dict) -> dict:
     print("    [3/3] Appointment Scheduler...")
     run_agent_with_retry(
         build_appointment_scheduler,
-        f"Book an appointment for patient_id={patient['patient_id']} with urgency_level={urgency_level}"
+        f"Book an appointment for patient_id={patient['patient_id']} with urgency_level={urgency_level}",
     )
     booking_json = json.loads(_tool_results.get("booking", '{"status": "failed"}'))
     print(f"          Slot: {booking_json.get('time_slot', 'N/A')}")
@@ -383,6 +428,7 @@ def run_triage_pipeline(patient: dict) -> dict:
 #  STEP 5: MAIN — Run the triage system
 # ═══════════════════════════════════════════════════════
 
+
 def main():
     """Run the 3-agent healthcare triage system with sample patient complaints."""
 
@@ -393,16 +439,22 @@ def main():
 
     for patient in PATIENT_COMPLAINTS:
         print(f"\n{'─' * 70}")
-        print(f"  Patient: {patient['name']} ({patient['patient_id']}, age {patient['age']})")
+        print(
+            f"  Patient: {patient['name']} ({patient['patient_id']}, age {patient['age']})"
+        )
         print(f"  Complaint: {patient['complaint']}")
         print(f"{'─' * 70}")
 
         result = run_triage_pipeline(patient)
 
-        print(f"\n  Summary:")
+        print("\n  Summary:")
         print(f"    Symptoms found: {result['symptoms'].get('total_matches', '?')}")
-        print(f"    Urgency: {result['urgency'].get('urgency', '?')} — {result['urgency'].get('reason', '')}")
-        print(f"    Appointment: {result['booking'].get('time_slot', 'N/A')} ({result['booking'].get('status', '?')})")
+        print(
+            f"    Urgency: {result['urgency'].get('urgency', '?')} — {result['urgency'].get('reason', '')}"
+        )
+        print(
+            f"    Appointment: {result['booking'].get('time_slot', 'N/A')} ({result['booking'].get('status', '?')})"
+        )
         print(f"    Instructions: {result['booking'].get('instructions', 'N/A')}")
 
 
