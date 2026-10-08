@@ -1,30 +1,3 @@
-"""
-smart_home_device_mgmt.py - STARTER
-======================================
-Module 1 Exercise: Build a 3-Agent Smart Home Device Management System
-
-Follow the same multi-agent coordinator pattern from the demo:
-  - 3 separate Agent instances (DeviceMonitor, DiagnosticsAgent, CommandAgent)
-  - Each agent has its own model, system prompt, and tool
-  - A coordinator calls them in sequence, passing outputs forward
-
-You have 6 TODOs to complete:
-  TODO 1: Build the Device Monitor agent (model + prompt + tool)
-  TODO 2: Build the Diagnostics agent (model + prompt + tool)
-  TODO 3: Build the Command agent (model + prompt + tool)
-  TODO 4: Coordinator step 1 — call Device Monitor
-  TODO 5: Coordinator step 2 — call Diagnostics Agent
-  TODO 6: Coordinator step 3 — call Command Agent for each issue
-
-Architecture:
-    Sensor Data → DeviceMonitor → DiagnosticsAgent → CommandAgent → Action Report
-
-Tech Stack:
-  - Python 3.11+
-  - Strands Agents SDK (Agent class, @tool decorator)
-  - Amazon Bedrock (Claude 3 Sonnet)
-"""
-
 import json
 import logging
 import os
@@ -48,7 +21,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
 
 # ─────────────────────────────────────────────────────
-# SAMPLE DATA — Pre-written, do not modify.
+# SAMPLE DATA
 # ─────────────────────────────────────────────────────
 DEVICE_REGISTRY = {
     "DEV-001": {
@@ -119,7 +92,7 @@ CORRECTIVE_ACTIONS = {
 }
 
 
-# The helper def clean_response: normalizes raw agent responses before they enter the application pipeline,
+# NOTE: The helper def clean_response: normalizes raw agent responses before they enter the application pipeline,
 # preventing model-specific formatting such as thinking tags from interfering with downstream parsing.
 def clean_response(text: str) -> str:
     """Strip Nova/Claude thinking tags from agent responses."""
@@ -160,7 +133,6 @@ def _make_read_sensor_data_tool():
 
         Args:
             device_id: The device's unique identifier (e.g., "DEV-001")
-
         Returns:
             JSON string with device info and current sensor readings
         """
@@ -197,10 +169,8 @@ def _make_diagnose_issue_tool():
         """Apply diagnostic rules to sensor readings to identify issues.
 
         Rules: temperature > 85 = overheating, connectivity < 20 = firmware_issue, battery < 10 = low_battery
-
         Args:
             sensor_data_json: JSON string from the Device Monitor
-
         Returns:
             JSON string with device_id, issues found, and status
         """
@@ -260,7 +230,6 @@ def _make_send_device_command_tool():
         Args:
             device_id: The device's unique identifier
             issue_type: The type of issue ("overheating", "firmware_issue", "low_battery")
-
         Returns:
             JSON string with command confirmation and action taken
         """
@@ -286,13 +255,6 @@ def _make_send_device_command_tool():
     return send_device_command
 
 
-# ═══════════════════════════════════════════════════════
-#  TODO 1: BUILD THE DEVICE MONITOR AGENT
-#  Follow the 3-step pattern from the demo's build_symptom_analyzer():
-#  model → system_prompt → Agent
-# ═══════════════════════════════════════════════════════
-
-
 def build_device_monitor() -> Agent:
     """Build the Device Monitor agent with a read_sensor_data tool."""
 
@@ -306,13 +268,10 @@ def build_device_monitor() -> Agent:
     def read_sensor_data(device_id: str) -> str:
         """Read the latest sensor data for a device.
 
-
         Args:
             device_id: The device's unique identifier (e.g., "DEV-001")
-
         Returns:
             JSON string with device info and current sensor readings
-
         """
 
         device_info = DEVICE_REGISTRY.get(device_id)
@@ -373,7 +332,6 @@ def build_diagnostics_agent() -> Agent:
 
         Args:
             sensor_data_json: JSON string from the Device Monitor
-
         Returns:
             JSON string with device_id, issues found, and status
         """
@@ -451,7 +409,6 @@ def build_command_agent() -> Agent:
         Args:
             device_id: The device's unique identifier
             issue_type: The type of issue ("overheating", "firmware_issue", "low_battery")
-
         Returns:
             JSON string with command confirmation and action taken
         """
@@ -488,12 +445,6 @@ def build_command_agent() -> Agent:
         system_prompt=system_prompt,
         tools=[send_device_command],
     )
-
-
-# ═══════════════════════════════════════════════════════
-#  COORDINATOR — Wire the 3 agents together
-#  Complete TODOs 4-6 to call each agent in sequence.
-# ═══════════════════════════════════════════════════════
 
 
 def run_device_pipeline(device_id: str) -> dict:
@@ -577,7 +528,7 @@ def run_device_pipeline(device_id: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════
-#  MAIN — Pre-written, do not modify.
+#  MAIN
 # ═══════════════════════════════════════════════════════
 
 
