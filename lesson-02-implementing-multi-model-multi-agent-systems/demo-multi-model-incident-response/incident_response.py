@@ -27,10 +27,11 @@ Tech Stack:
 """
 
 import json
+import logging
 import os
 import re
 import time
-import logging
+
 from dotenv import load_dotenv
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -42,15 +43,22 @@ logging.basicConfig(level=logging.WARNING)
 
 def clean_response(text: str) -> str:
     """Strip <thinking>...</thinking> tags from Nova model outputs."""
-    return re.sub(r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL).strip()
+    return re.sub(
+        r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL
+    ).strip()
+
 
 # ─────────────────────────────────────────────────────
 # CONFIGURATION — Three different models
 # ─────────────────────────────────────────────────────
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-NOVA_LITE_MODEL = os.environ.get("NOVA_LITE_MODEL", "amazon.nova-lite-v1:0")                    # Fast, lightweight
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")     # Deep reasoning
-NOVA_PRO_MODEL = os.environ.get("NOVA_PRO_MODEL", "amazon.nova-pro-v1:0")                      # Balanced
+NOVA_LITE_MODEL = os.environ.get(
+    "NOVA_LITE_MODEL", "amazon.nova-lite-v1:0"
+)  # Fast, lightweight
+CLAUDE_MODEL = os.environ.get(
+    "CLAUDE_MODEL", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+)  # Deep reasoning
+NOVA_PRO_MODEL = os.environ.get("NOVA_PRO_MODEL", "amazon.nova-pro-v1:0")  # Balanced
 
 # ─────────────────────────────────────────────────────
 # SAMPLE DATA
@@ -83,28 +91,55 @@ INCIDENTS = [
 ]
 
 SEVERITY_KEYWORDS = {
-    "critical": ["cpu utilization at 9", "5xx errors", "response time", "outage", "down"],
-    "warning":  ["disk usage at 8", "growth rate", "estimated full", "degraded", "slow"],
-    "info":     ["completed", "health checks passed", "successful", "deployed"],
+    "critical": [
+        "cpu utilization at 9",
+        "5xx errors",
+        "response time",
+        "outage",
+        "down",
+    ],
+    "warning": ["disk usage at 8", "growth rate", "estimated full", "degraded", "slow"],
+    "info": ["completed", "health checks passed", "successful", "deployed"],
 }
 
 KNOWN_ISSUES = {
     "high_cpu": {
         "probable_cause": "Memory leak or traffic spike causing resource exhaustion",
-        "common_causes": ["Memory leak in application", "Runaway process", "DDoS attack", "Unoptimized query"],
-        "runbooks": ["Scale horizontally (add 2 instances)", "Restart affected pod", "Enable WAF rate limiting"],
+        "common_causes": [
+            "Memory leak in application",
+            "Runaway process",
+            "DDoS attack",
+            "Unoptimized query",
+        ],
+        "runbooks": [
+            "Scale horizontally (add 2 instances)",
+            "Restart affected pod",
+            "Enable WAF rate limiting",
+        ],
         "estimated_resolution": "15-30 minutes",
     },
     "disk_usage": {
         "probable_cause": "Log accumulation without rotation policy",
-        "common_causes": ["Log rotation disabled", "Large temp files", "Database bloat", "Orphaned snapshots"],
-        "runbooks": ["Enable log rotation (7-day retention)", "Clean /tmp older than 24h", "Run VACUUM FULL"],
+        "common_causes": [
+            "Log rotation disabled",
+            "Large temp files",
+            "Database bloat",
+            "Orphaned snapshots",
+        ],
+        "runbooks": [
+            "Enable log rotation (7-day retention)",
+            "Clean /tmp older than 24h",
+            "Run VACUUM FULL",
+        ],
         "estimated_resolution": "1-2 hours",
     },
     "deployment": {
         "probable_cause": "Normal deployment activity — no action needed",
         "common_causes": ["Scheduled release"],
-        "runbooks": ["Monitor canary metrics for 30 minutes", "Verify rollback plan ready"],
+        "runbooks": [
+            "Monitor canary metrics for 30 minutes",
+            "Verify rollback plan ready",
+        ],
         "estimated_resolution": "N/A — monitoring only",
     },
 }
@@ -116,9 +151,12 @@ SERVICE_CATEGORY_MAP = {
 }
 
 STATUS_TEMPLATES = {
-    "critical": {"audience": "Engineering + Management + On-call", "tone": "Urgent, concise, action-oriented"},
-    "warning":  {"audience": "Engineering team", "tone": "Informative, preventive"},
-    "info":     {"audience": "Engineering team", "tone": "Brief, positive"},
+    "critical": {
+        "audience": "Engineering + Management + On-call",
+        "tone": "Urgent, concise, action-oriented",
+    },
+    "warning": {"audience": "Engineering team", "tone": "Informative, preventive"},
+    "info": {"audience": "Engineering team", "tone": "Brief, positive"},
 }
 
 # KEY PATTERN: Shared cache so Python can read tool outputs across agents.
@@ -130,6 +168,7 @@ classification_cache = {}
 # ═══════════════════════════════════════════════════════
 #  AGENT 1: ALERT ROUTER  (Nova Lite — fast classification)
 # ═══════════════════════════════════════════════════════
+
 
 def build_routing_agent() -> Agent:
     """Build the Alert Router using Nova Lite for fast severity classification."""
@@ -191,6 +230,7 @@ Do NOT add any other commentary."""
 #  AGENT 2: ROOT CAUSE ANALYZER  (Claude — deep reasoning)
 # ═══════════════════════════════════════════════════════
 
+
 def build_analysis_agent() -> Agent:
     """Build the Root Cause Analyzer using Claude for deep investigation."""
 
@@ -230,15 +270,20 @@ Do NOT repeat the raw JSON. Just give the 3-line diagnosis."""
         category = SERVICE_CATEGORY_MAP.get(incident["affected_service"], "unknown")
         known = KNOWN_ISSUES.get(category, {})
 
-        return json.dumps({
-            "incident_id": incident_id,
-            "incident_message": incident["message"],
-            "category": category,
-            "probable_cause": known.get("probable_cause", "Unknown — requires manual investigation"),
-            "common_causes": known.get("common_causes", []),
-            "runbooks": known.get("runbooks", []),
-            "estimated_resolution": known.get("estimated_resolution", "Unknown"),
-        }, indent=2)
+        return json.dumps(
+            {
+                "incident_id": incident_id,
+                "incident_message": incident["message"],
+                "category": category,
+                "probable_cause": known.get(
+                    "probable_cause", "Unknown — requires manual investigation"
+                ),
+                "common_causes": known.get("common_causes", []),
+                "runbooks": known.get("runbooks", []),
+                "estimated_resolution": known.get("estimated_resolution", "Unknown"),
+            },
+            indent=2,
+        )
 
     # STEP 3: Build Agent
     return Agent(model=model, system_prompt=system_prompt, tools=[investigate_incident])
@@ -247,6 +292,7 @@ Do NOT repeat the raw JSON. Just give the 3-line diagnosis."""
 # ═══════════════════════════════════════════════════════
 #  AGENT 3: STATUS DRAFTER  (Nova Pro — balanced communication)
 # ═══════════════════════════════════════════════════════
+
 
 def build_status_agent() -> Agent:
     """Build the Status Drafter using Nova Pro for balanced communication."""
@@ -288,23 +334,29 @@ Match the tone to the severity. Do NOT exceed 4 lines."""
 
         template = STATUS_TEMPLATES.get(severity.lower(), STATUS_TEMPLATES["info"])
 
-        return json.dumps({
-            "incident_id": incident_id,
-            "severity": severity,
-            "incident_message": incident["message"],
-            "affected_service": incident["affected_service"],
-            "timestamp": incident["timestamp"],
-            "audience": template["audience"],
-            "tone": template["tone"],
-        }, indent=2)
+        return json.dumps(
+            {
+                "incident_id": incident_id,
+                "severity": severity,
+                "incident_message": incident["message"],
+                "affected_service": incident["affected_service"],
+                "timestamp": incident["timestamp"],
+                "audience": template["audience"],
+                "tone": template["tone"],
+            },
+            indent=2,
+        )
 
     # STEP 3: Build Agent
-    return Agent(model=model, system_prompt=system_prompt, tools=[draft_status_components])
+    return Agent(
+        model=model, system_prompt=system_prompt, tools=[draft_status_components]
+    )
 
 
 # ═══════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════
+
 
 def main():
     print("=" * 70)
@@ -322,7 +374,7 @@ def main():
         print(f"{'━' * 70}")
 
         # ── Step 1: Route with Nova Lite (fast) ─────────────────
-        print(f"\n  [Agent 1] Alert Router (Nova Lite)")
+        print("\n  [Agent 1] Alert Router (Nova Lite)")
         routing_agent = build_routing_agent()
         t1 = time.time()
         routing_result = routing_agent(f"Classify incident {inc_id}")
@@ -332,7 +384,7 @@ def main():
         print(f"  Latency: {routing_time:.1f}s")
 
         # ── Step 2: Analyze with Claude (deep) ──────────────────
-        print(f"\n  [Agent 2] Root Cause Analyzer (Claude)")
+        print("\n  [Agent 2] Root Cause Analyzer (Claude)")
         analysis_agent = build_analysis_agent()
         t2 = time.time()
         analysis_result = analysis_agent(f"Investigate incident {inc_id}")
@@ -341,7 +393,7 @@ def main():
         print(f"  Latency: {analysis_time:.1f}s")
 
         # ── Step 3: Draft status with Nova Pro (balanced) ───────
-        print(f"\n  [Agent 3] Status Drafter (Nova Pro)")
+        print("\n  [Agent 3] Status Drafter (Nova Pro)")
         status_agent = build_status_agent()
         t3 = time.time()
         status_result = status_agent(
@@ -352,14 +404,16 @@ def main():
         print(f"  Latency: {status_time:.1f}s")
 
         total = routing_time + analysis_time + status_time
-        latency_report.append({
-            "incident": inc_id,
-            "severity": severity,
-            "nova_lite_s": round(routing_time, 1),
-            "claude_s": round(analysis_time, 1),
-            "nova_pro_s": round(status_time, 1),
-            "total_s": round(total, 1),
-        })
+        latency_report.append(
+            {
+                "incident": inc_id,
+                "severity": severity,
+                "nova_lite_s": round(routing_time, 1),
+                "claude_s": round(analysis_time, 1),
+                "nova_pro_s": round(status_time, 1),
+                "total_s": round(total, 1),
+            }
+        )
 
     # ── Latency Comparison Table ────────────────────────────
     print(f"\n{'═' * 70}")
@@ -369,17 +423,19 @@ def main():
     print(header)
     print(f"  {'─' * 66}")
     for r in latency_report:
-        print(f"  {r['incident']:<10} {r['severity']:<10} {r['nova_lite_s']:<11.1f} {r['claude_s']:<10.1f} {r['nova_pro_s']:<10.1f} {r['total_s']:<8.1f}")
+        print(
+            f"  {r['incident']:<10} {r['severity']:<10} {r['nova_lite_s']:<11.1f} {r['claude_s']:<10.1f} {r['nova_pro_s']:<10.1f} {r['total_s']:<8.1f}"
+        )
 
     # ── Cost Projection Table ───────────────────────────────
-    # Reference pricing per 1M tokens (us-east-1, on-demand, April 2026).
+    # Reference pricing per 1M tokens (us-east-1, on-demand, October 2026).
     # These are INDICATIVE numbers — always check current pricing at
     # https://aws.amazon.com/bedrock/pricing/ before sizing a production workload.
     pricing = {
         # model_name: (input_per_1M, output_per_1M)
         "Nova Lite": (0.06, 0.24),
-        "Nova Pro":  (0.80, 3.20),
-        "Claude 3 Sonnet": (3.00, 15.00),
+        "Nova Pro": (0.80, 3.20),
+        "Claude 4.5 Sonnet": (3.30, 16.50),
     }
 
     # Assume a typical short-task footprint per agent call. Real workloads
@@ -392,12 +448,12 @@ def main():
         return (tokens_in_per_call * inp + tokens_out_per_call * out) / 1_000_000
 
     cost_per_incident = {
-        "Nova Lite (routing)":     dollars_per_call("Nova Lite"),
-        "Claude (analysis)":       dollars_per_call("Claude 3 Sonnet"),
-        "Nova Pro (comms)":        dollars_per_call("Nova Pro"),
+        "Nova Lite (routing)": dollars_per_call("Nova Lite"),
+        "Claude (analysis)": dollars_per_call("Claude 4.5 Sonnet"),
+        "Nova Pro (comms)": dollars_per_call("Nova Pro"),
     }
     mix_per_incident = sum(cost_per_incident.values())
-    claude_only_per_incident = 3 * dollars_per_call("Claude 3 Sonnet")
+    claude_only_per_incident = 3 * dollars_per_call("Claude 4.5 Sonnet")
 
     # Project to 10,000 incidents/day
     volume = 10_000
@@ -409,29 +465,33 @@ def main():
     print(f"\n{'═' * 70}")
     print("  COST PROJECTION (10,000 incidents/day)")
     print(f"{'═' * 70}")
-    print(f"  Assumed per-call footprint: {tokens_in_per_call} input + {tokens_out_per_call} output tokens")
-    print(f"  Reference pricing per 1M tokens (us-east-1, on-demand):")
+    print(
+        f"  Assumed per-call footprint: {tokens_in_per_call} input + {tokens_out_per_call} output tokens"
+    )
+    print("  Reference pricing per 1M tokens (us-east-1, on-demand):")
     for name, (inp, out) in pricing.items():
         print(f"    {name:<18} ${inp:>6.2f} in  /  ${out:>6.2f} out")
 
-    print(f"\n  Multi-model mix (this demo):")
+    print("\n  Multi-model mix (this demo):")
     for role, cost in cost_per_incident.items():
         print(f"    {role:<22} ${cost * 1000:>7.4f} per 1K calls")
     print(f"    {'─' * 40}")
     print(f"    {'TOTAL per incident':<22} ${mix_per_incident:>8.6f}")
     print(f"    {'Daily @ 10K/day':<22} ${mix_daily:>8.2f}")
 
-    print(f"\n  Claude-for-everything baseline:")
+    print("\n  Claude-for-everything baseline:")
     print(f"    {'TOTAL per incident':<22} ${claude_only_per_incident:>8.6f}")
     print(f"    {'Daily @ 10K/day':<22} ${claude_daily:>8.2f}")
 
-    print(f"\n  Savings from multi-model routing: ${savings_daily:.2f}/day ({savings_pct:.0f}% reduction)")
+    print(
+        f"\n  Savings from multi-model routing: ${savings_daily:.2f}/day ({savings_pct:.0f}% reduction)"
+    )
 
-    print(f"\n  Key Insight: Nova Lite handles fast routing, Claude provides")
-    print(f"  deep analysis, Nova Pro balances speed and quality for comms.")
-    print(f"  The 80/20 rule applies: most agent calls are routing/comms where")
-    print(f"  cheap models are good enough. Reserve Claude-class spend for the")
-    print(f"  reasoning hot path that actually needs it.\n")
+    print("\n  Key Insight: Nova Lite handles fast routing, Claude provides")
+    print("  deep analysis, Nova Pro balances speed and quality for comms.")
+    print("  The 80/20 rule applies: most agent calls are routing/comms where")
+    print("  cheap models are good enough. Reserve Claude-class spend for the")
+    print("  reasoning hot path that actually needs it.\n")
 
 
 if __name__ == "__main__":
