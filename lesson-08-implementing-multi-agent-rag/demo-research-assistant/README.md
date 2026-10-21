@@ -66,3 +66,29 @@ aws cloudformation delete-stack --stack-name lesson-08-demo-rag
 4. **Result aggregation** — combine + rank + top-K selection across KBs
 5. **Grounded synthesis** — every factual claim cites a specific [DOC_ID]
 6. **Graceful handling** — out-of-scope queries return minimal results, synthesis acknowledges gaps
+
+# Implementation Notes — AWS Bedrock Managed Knowledge Bases
+
+**Retrieval configuration compatibility**
+
+The original demo used `vectorSearchConfiguration` in the Bedrock `Retrieve` API. When executed against Managed Knowledge Bases, the API returned:
+
+```text
+ValidationException: Incompatible configuration:
+vectorSearchConfiguration is not supported for managed knowledge bases.
+Use managedSearchConfiguration instead.
+```
+
+The retrieval configuration was updated to use `managedSearchConfiguration`. Direct boto3 retrieval and the complete multi-agent pipeline were subsequently validated successfully.
+
+**Environment configuration**
+
+The example AWS region was updated to `us-east-1`, matching the environment used for validation. Knowledge Base IDs remain empty in `.env.example` because they are deployment-specific.
+
+During an isolated diagnostic executed through Python standard input, automatic `.env` discovery raised an `AssertionError`. Explicitly passing `dotenv_path=".env"` resolved that diagnostic issue. This was not established as a defect in the main application.
+
+**Retrieval relevance limitation**
+
+All three demo queries returned passages from both Knowledge Bases, including the intentionally out-of-domain blockchain query. Although the synthesis agent correctly declined to provide unsupported findings, retrieval scores alone did not establish factual relevance.
+
+The current implementation demonstrates successful parallel retrieval, aggregation, and grounded synthesis, but does not implement a validated relevance or out-of-scope classification mechanism.

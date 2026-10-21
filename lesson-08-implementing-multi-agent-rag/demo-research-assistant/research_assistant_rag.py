@@ -6,29 +6,29 @@ Module 8 Demo: Building a Multi-Agent RAG Research Assistant
 Architecture:
     Student asks research question
          │
-    ┌────┴─────────────────────────────────────────────────┐
+    ┌────┴───────────────────────────────────────────────────┐
     │  Parallel Retrieval (ThreadPoolExecutor)               │
     │  Two specialized retrievers query domain-specific KBs  │
-    └────┬──────────────────┬──────────────────────────────┘
+    └────┬──────────────────┬────────────────────────────────┘
          │                  │
-    ┌────┴──────┐    ┌─────┴──────┐
+    ┌────┴───────┐    ┌─────┴──────┐
     │ CSRetriever│    │BioRetriever│
     │ (CS KB)    │    │ (Bio KB)   │
-    └────┬──────┘    └─────┬──────┘
+    └────┬───────┘    └─────┬──────┘
          │                  │
-    ┌────┴──────────────────┴──────────────────────────────┐
+    ┌────┴──────────────────┴────────────────────────────────┐
     │  Result Aggregation                                    │
     │  - Combine passages from both KBs                      │
     │  - Rank by relevance score                             │
     │  - Select top-K most relevant                          │
-    └────┬─────────────────────────────────────────────────┘
+    └────┬───────────────────────────────────────────────────┘
          │
-    ┌────┴─────────────────────────────────────────────────┐
-    │  SynthesisAgent                                        │
+    ┌────┴────────────────────────────────────────────────────┐
+    │  SynthesisAgent                                         │
     │  - Produces grounded answer with citations              │
     │  - Every claim must reference a specific passage        │
     │  - Handles partial results gracefully                   │
-    └──────────────────────────────────────────────────────┘
+    └─────────────────────────────────────────────────────────┘
 
 Key Concepts (Module 8):
   1. SPECIALIZED RETRIEVERS: Each retriever owns one KB, one tool
@@ -55,12 +55,13 @@ Production-mapping comments show the exact boto3 API calls.
 """
 
 import json
+import logging
 import os
 import re
 import time
-import logging
-import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import boto3
 from dotenv import load_dotenv
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -72,7 +73,9 @@ logging.basicConfig(level=logging.WARNING)
 
 def clean_response(text: str) -> str:
     """Strip <thinking>...</thinking> tags from Nova model outputs."""
-    return re.sub(r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL).strip()
+    return re.sub(
+        r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL
+    ).strip()
 
 
 # NOTE: In production, extract shared helpers like run_agent_with_retry() and
@@ -88,11 +91,15 @@ def run_agent_with_retry(agent_builder, prompt: str, max_retries: int = 3) -> fl
             return time.time() - t
         except Exception as e:
             if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s...")
+                wait = 2**attempt
+                print(
+                    f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s..."
+                )
                 time.sleep(wait)
             else:
-                print(f"    [Failed] {e.__class__.__name__} after {max_retries} attempts")
+                print(
+                    f"    [Failed] {e.__class__.__name__} after {max_retries} attempts"
+                )
                 raise
 
 
@@ -120,120 +127,199 @@ bedrock_agent_runtime = boto3.client("bedrock-agent-runtime", region_name=AWS_RE
 
 CS_PAPERS = [
     {
-        "doc_id": "CS-001", "title": "Deep Learning for Genomic Sequence Analysis",
+        "doc_id": "CS-001",
+        "title": "Deep Learning for Genomic Sequence Analysis",
         "source": "Journal of ML Research, 2024",
         "content": "We present a transformer-based architecture for predicting gene expression "
-                   "levels from DNA sequences. Our model achieves 94% accuracy on the benchmark "
-                   "GenomeBERT dataset, outperforming previous CNN-based approaches by 12%. "
-                   "The attention mechanism reveals biologically meaningful motifs.",
-        "keywords": ["machine learning", "deep learning", "genomics", "transformer", "gene expression", "DNA"],
+        "levels from DNA sequences. Our model achieves 94% accuracy on the benchmark "
+        "GenomeBERT dataset, outperforming previous CNN-based approaches by 12%. "
+        "The attention mechanism reveals biologically meaningful motifs.",
+        "keywords": [
+            "machine learning",
+            "deep learning",
+            "genomics",
+            "transformer",
+            "gene expression",
+            "DNA",
+        ],
     },
     {
-        "doc_id": "CS-002", "title": "Federated Learning in Healthcare: Privacy-Preserving ML",
+        "doc_id": "CS-002",
+        "title": "Federated Learning in Healthcare: Privacy-Preserving ML",
         "source": "IEEE Transactions on AI, 2024",
         "content": "Federated learning enables hospitals to collaboratively train ML models "
-                   "without sharing patient data. We demonstrate a federated approach for "
-                   "predicting drug interactions that achieves 91% accuracy while maintaining "
-                   "HIPAA compliance. Communication overhead is reduced 60% via gradient compression.",
-        "keywords": ["federated learning", "healthcare", "privacy", "drug interactions", "machine learning"],
+        "without sharing patient data. We demonstrate a federated approach for "
+        "predicting drug interactions that achieves 91% accuracy while maintaining "
+        "HIPAA compliance. Communication overhead is reduced 60% via gradient compression.",
+        "keywords": [
+            "federated learning",
+            "healthcare",
+            "privacy",
+            "drug interactions",
+            "machine learning",
+        ],
     },
     {
-        "doc_id": "CS-003", "title": "Reinforcement Learning for Protein Folding Optimization",
+        "doc_id": "CS-003",
+        "title": "Reinforcement Learning for Protein Folding Optimization",
         "source": "NeurIPS 2024 Proceedings",
         "content": "We apply deep reinforcement learning to optimize protein folding simulations. "
-                   "Our RL agent explores conformational space 50x faster than molecular dynamics. "
-                   "The approach discovers novel folding pathways for 3 previously unsolved proteins, "
-                   "validated against experimental X-ray crystallography data.",
-        "keywords": ["reinforcement learning", "protein folding", "optimization", "molecular dynamics"],
+        "Our RL agent explores conformational space 50x faster than molecular dynamics. "
+        "The approach discovers novel folding pathways for 3 previously unsolved proteins, "
+        "validated against experimental X-ray crystallography data.",
+        "keywords": [
+            "reinforcement learning",
+            "protein folding",
+            "optimization",
+            "molecular dynamics",
+        ],
     },
     {
-        "doc_id": "CS-004", "title": "Natural Language Processing for Biomedical Literature Mining",
+        "doc_id": "CS-004",
+        "title": "Natural Language Processing for Biomedical Literature Mining",
         "source": "ACL 2024 Proceedings",
         "content": "Our NLP pipeline extracts gene-disease associations from 2 million PubMed "
-                   "abstracts with 89% F1 score. We fine-tune BioBERT on a curated dataset of "
-                   "10,000 annotated abstracts. The system identifies 340 novel gene-disease "
-                   "associations not present in existing databases.",
-        "keywords": ["NLP", "biomedical", "text mining", "gene-disease", "BioBERT", "machine learning"],
+        "abstracts with 89% F1 score. We fine-tune BioBERT on a curated dataset of "
+        "10,000 annotated abstracts. The system identifies 340 novel gene-disease "
+        "associations not present in existing databases.",
+        "keywords": [
+            "NLP",
+            "biomedical",
+            "text mining",
+            "gene-disease",
+            "BioBERT",
+            "machine learning",
+        ],
     },
     {
-        "doc_id": "CS-005", "title": "Graph Neural Networks for Drug Discovery",
+        "doc_id": "CS-005",
+        "title": "Graph Neural Networks for Drug Discovery",
         "source": "ICML 2024 Workshop",
         "content": "We introduce MolGNN, a graph neural network for predicting molecular "
-                   "properties relevant to drug discovery. MolGNN achieves state-of-the-art "
-                   "results on 8 of 12 MoleculeNet benchmarks. The model identifies 15 "
-                   "candidate compounds for malaria treatment, 3 of which show promise in vitro.",
-        "keywords": ["graph neural networks", "drug discovery", "molecular properties", "machine learning"],
+        "properties relevant to drug discovery. MolGNN achieves state-of-the-art "
+        "results on 8 of 12 MoleculeNet benchmarks. The model identifies 15 "
+        "candidate compounds for malaria treatment, 3 of which show promise in vitro.",
+        "keywords": [
+            "graph neural networks",
+            "drug discovery",
+            "molecular properties",
+            "machine learning",
+        ],
     },
     {
-        "doc_id": "CS-006", "title": "Quantum Computing Algorithms for Cryptography",
+        "doc_id": "CS-006",
+        "title": "Quantum Computing Algorithms for Cryptography",
         "source": "ACM Computing Surveys, 2024",
         "content": "We survey post-quantum cryptographic algorithms resistant to Shor's algorithm. "
-                   "Lattice-based schemes show the best balance of security and performance. "
-                   "We benchmark 5 NIST finalist algorithms on current quantum simulators.",
+        "Lattice-based schemes show the best balance of security and performance. "
+        "We benchmark 5 NIST finalist algorithms on current quantum simulators.",
         "keywords": ["quantum computing", "cryptography", "post-quantum", "lattice"],
     },
 ]
 
 BIO_PAPERS = [
     {
-        "doc_id": "BIO-001", "title": "CRISPR-Cas9 Applications in Crop Genomics",
+        "doc_id": "BIO-001",
+        "title": "CRISPR-Cas9 Applications in Crop Genomics",
         "source": "Nature Biotechnology, 2024",
         "content": "We demonstrate CRISPR-Cas9 gene editing for drought resistance in wheat. "
-                   "Targeted knockout of the TaDREB2 gene increases water-use efficiency by 40%. "
-                   "Field trials across 3 climate zones confirm yield improvements of 15-25% "
-                   "under water-stressed conditions.",
-        "keywords": ["CRISPR", "genomics", "crop science", "gene editing", "drought resistance"],
+        "Targeted knockout of the TaDREB2 gene increases water-use efficiency by 40%. "
+        "Field trials across 3 climate zones confirm yield improvements of 15-25% "
+        "under water-stressed conditions.",
+        "keywords": [
+            "CRISPR",
+            "genomics",
+            "crop science",
+            "gene editing",
+            "drought resistance",
+        ],
     },
     {
-        "doc_id": "BIO-002", "title": "Machine Learning Identifies Novel Cancer Biomarkers",
+        "doc_id": "BIO-002",
+        "title": "Machine Learning Identifies Novel Cancer Biomarkers",
         "source": "Cancer Research, 2024",
         "content": "Using ML-based analysis of single-cell RNA sequencing data, we identify "
-                   "7 novel biomarkers for early-stage pancreatic cancer. A random forest classifier "
-                   "achieves 96% sensitivity and 88% specificity. Three biomarkers show promise "
-                   "for liquid biopsy detection, enabling non-invasive screening.",
-        "keywords": ["machine learning", "cancer", "biomarkers", "RNA sequencing", "genomics"],
+        "7 novel biomarkers for early-stage pancreatic cancer. A random forest classifier "
+        "achieves 96% sensitivity and 88% specificity. Three biomarkers show promise "
+        "for liquid biopsy detection, enabling non-invasive screening.",
+        "keywords": [
+            "machine learning",
+            "cancer",
+            "biomarkers",
+            "RNA sequencing",
+            "genomics",
+        ],
     },
     {
-        "doc_id": "BIO-003", "title": "Microbiome-Host Interactions in Inflammatory Disease",
+        "doc_id": "BIO-003",
+        "title": "Microbiome-Host Interactions in Inflammatory Disease",
         "source": "Cell, 2024",
         "content": "We map the gut microbiome's influence on inflammatory bowel disease using "
-                   "metagenomic sequencing of 500 patients. Specific Bacteroides species correlate "
-                   "with disease remission (p<0.001). Fecal transplant from remission patients "
-                   "reduces inflammation markers by 65% in mouse models.",
-        "keywords": ["microbiome", "inflammatory disease", "metagenomics", "gut health"],
+        "metagenomic sequencing of 500 patients. Specific Bacteroides species correlate "
+        "with disease remission (p<0.001). Fecal transplant from remission patients "
+        "reduces inflammation markers by 65% in mouse models.",
+        "keywords": [
+            "microbiome",
+            "inflammatory disease",
+            "metagenomics",
+            "gut health",
+        ],
     },
     {
-        "doc_id": "BIO-004", "title": "Genomic Analysis of Antibiotic Resistance Evolution",
+        "doc_id": "BIO-004",
+        "title": "Genomic Analysis of Antibiotic Resistance Evolution",
         "source": "Science, 2024",
         "content": "Whole-genome sequencing of 1,200 MRSA isolates reveals 4 novel resistance "
-                   "mechanisms involving horizontal gene transfer. We trace resistance gene "
-                   "flow across hospital networks using phylogenetic analysis. ML-based prediction "
-                   "of resistance patterns achieves 93% accuracy.",
-        "keywords": ["genomics", "antibiotic resistance", "MRSA", "gene transfer", "machine learning"],
+        "mechanisms involving horizontal gene transfer. We trace resistance gene "
+        "flow across hospital networks using phylogenetic analysis. ML-based prediction "
+        "of resistance patterns achieves 93% accuracy.",
+        "keywords": [
+            "genomics",
+            "antibiotic resistance",
+            "MRSA",
+            "gene transfer",
+            "machine learning",
+        ],
     },
     {
-        "doc_id": "BIO-005", "title": "Protein Engineering for Enzyme Optimization",
+        "doc_id": "BIO-005",
+        "title": "Protein Engineering for Enzyme Optimization",
         "source": "Nature Chemical Biology, 2024",
         "content": "Directed evolution combined with computational protein design yields enzymes "
-                   "with 100x improved catalytic efficiency for biofuel production. Deep learning "
-                   "models predict beneficial mutations with 78% accuracy, reducing screening "
-                   "cycles from 12 to 3.",
-        "keywords": ["protein engineering", "enzyme", "directed evolution", "deep learning", "biofuel"],
+        "with 100x improved catalytic efficiency for biofuel production. Deep learning "
+        "models predict beneficial mutations with 78% accuracy, reducing screening "
+        "cycles from 12 to 3.",
+        "keywords": [
+            "protein engineering",
+            "enzyme",
+            "directed evolution",
+            "deep learning",
+            "biofuel",
+        ],
     },
     {
-        "doc_id": "BIO-006", "title": "Neural Circuit Mapping in Drosophila",
+        "doc_id": "BIO-006",
+        "title": "Neural Circuit Mapping in Drosophila",
         "source": "Neuron, 2024",
         "content": "Using electron microscopy and connectomics, we map the complete neural circuit "
-                   "for olfactory learning in Drosophila melanogaster. The circuit contains 347 "
-                   "neurons and 2,891 synapses. Ablation experiments confirm the critical role "
-                   "of mushroom body output neurons in associative memory.",
-        "keywords": ["neuroscience", "neural circuits", "connectomics", "Drosophila", "olfactory"],
+        "for olfactory learning in Drosophila melanogaster. The circuit contains 347 "
+        "neurons and 2,891 synapses. Ablation experiments confirm the critical role "
+        "of mushroom body output neurons in associative memory.",
+        "keywords": [
+            "neuroscience",
+            "neural circuits",
+            "connectomics",
+            "Drosophila",
+            "olfactory",
+        ],
     },
 ]
 
+
 # STEP 2: BEDROCK KB RETRIEVAL — Real Amazon Bedrock Knowledge Base API calls
-def retrieve_from_kb(kb_id: str, query: str, kb_name: str,
-                     top_k: int = 5, simulate_failure: bool = False) -> list[dict]:
+def retrieve_from_kb(
+    kb_id: str, query: str, kb_name: str, top_k: int = 5, simulate_failure: bool = False
+) -> list[dict]:
     """
     Retrieve relevant documents from a Bedrock Knowledge Base.
 
@@ -268,10 +354,10 @@ def retrieve_from_kb(kb_id: str, query: str, kb_name: str,
     # the top-K most semantically similar chunks with relevance scores.
     response = bedrock_agent_runtime.retrieve(
         knowledgeBaseId=kb_id,
-        retrievalQuery={"text": query},          # natural language query
+        retrievalQuery={"text": query},  # natural language query
         retrievalConfiguration={
-            "vectorSearchConfiguration": {
-                "numberOfResults": top_k,         # how many chunks to return
+            "managedSearchConfiguration": {
+                "numberOfResults": top_k,
             }
         },
     )
@@ -282,16 +368,22 @@ def retrieve_from_kb(kb_id: str, query: str, kb_name: str,
         content = result.get("content", {}).get("text", "")
         score = result.get("score", 0.0)
         location = result.get("location", {})
-        uri = location.get("s3Location", {}).get("uri", "") if location.get("type") == "S3" else ""
+        uri = (
+            location.get("s3Location", {}).get("uri", "")
+            if location.get("type") == "S3"
+            else ""
+        )
 
-        results.append({
-            "doc_id": f"{kb_name}-{i+1}",
-            "title": uri.split("/")[-1] if uri else f"Result {i+1}",
-            "source": uri or kb_name,
-            "content": content,
-            "score": score,
-            "kb": kb_name,
-        })
+        results.append(
+            {
+                "doc_id": f"{kb_name}-{i + 1}",
+                "title": uri.split("/")[-1] if uri else f"Result {i + 1}",
+                "source": uri or kb_name,
+                "content": content,
+                "score": score,
+                "kb": kb_name,
+            }
+        )
 
     return results
 
@@ -325,9 +417,11 @@ retrieval_results = {"cs": [], "bio": []}
 def build_cs_retriever(query: str) -> Agent:
     """CS Papers retriever agent — queries the Computer Science KB."""
     # STEP 3.1: BedrockModel — Nova Lite for CS KB retrieval (temperature 0.0)
-    model = BedrockModel(model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.0)
+    model = BedrockModel(
+        model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.0
+    )
     # STEP 3.2: System prompt — Query CS papers knowledge base
-    system_prompt = f"""You are a Computer Science paper retrieval agent. Your ONLY job:
+    system_prompt = """You are a Computer Science paper retrieval agent. Your ONLY job:
 1. Call retrieve_cs_papers with the query
 2. Report how many passages were found and their relevance scores
 Do NOT add any other commentary."""
@@ -346,15 +440,18 @@ Do NOT add any other commentary."""
         passages = retrieve_from_kb(CS_KB_ID, search_query, "CS Papers", TOP_K)
         retrieval_results["cs"] = passages
 
-        return json.dumps({
-            "kb": "CS Papers",
-            "query": search_query,
-            "passages_found": len(passages),
-            "results": [
-                {"doc_id": p["doc_id"], "title": p["title"], "score": p["score"]}
-                for p in passages
-            ],
-        }, indent=2)
+        return json.dumps(
+            {
+                "kb": "CS Papers",
+                "query": search_query,
+                "passages_found": len(passages),
+                "results": [
+                    {"doc_id": p["doc_id"], "title": p["title"], "score": p["score"]}
+                    for p in passages
+                ],
+            },
+            indent=2,
+        )
 
     # STEP 3.3: Build Agent — CS retriever with retrieve_cs_papers tool
     return Agent(model=model, system_prompt=system_prompt, tools=[retrieve_cs_papers])
@@ -363,9 +460,11 @@ Do NOT add any other commentary."""
 def build_bio_retriever(query: str, simulate_failure: bool = False) -> Agent:
     """Biology Papers retriever agent — queries the Biology KB."""
     # STEP 3.4: BedrockModel — Nova Lite for Bio KB retrieval (temperature 0.0)
-    model = BedrockModel(model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.0)
+    model = BedrockModel(
+        model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.0
+    )
     # STEP 3.5: System prompt — Query Biology papers knowledge base
-    system_prompt = f"""You are a Biology paper retrieval agent. Your ONLY job:
+    system_prompt = """You are a Biology paper retrieval agent. Your ONLY job:
 1. Call retrieve_bio_papers with the query
 2. Report how many passages were found and their relevance scores
 Do NOT add any other commentary."""
@@ -382,33 +481,43 @@ Do NOT add any other commentary."""
             JSON with retrieved passages and relevance scores
         """
         try:
-            passages = retrieve_from_kb(BIO_KB_ID, search_query, "Biology Papers", TOP_K, simulate_failure)
+            passages = retrieve_from_kb(
+                BIO_KB_ID, search_query, "Biology Papers", TOP_K, simulate_failure
+            )
             retrieval_results["bio"] = passages
         except ConnectionError as e:
             retrieval_results["bio"] = []
-            return json.dumps({
+            return json.dumps(
+                {
+                    "kb": "Biology Papers",
+                    "query": search_query,
+                    "error": str(e),
+                    "passages_found": 0,
+                },
+                indent=2,
+            )
+
+        return json.dumps(
+            {
                 "kb": "Biology Papers",
                 "query": search_query,
-                "error": str(e),
-                "passages_found": 0,
-            }, indent=2)
-
-        return json.dumps({
-            "kb": "Biology Papers",
-            "query": search_query,
-            "passages_found": len(passages),
-            "results": [
-                {"doc_id": p["doc_id"], "title": p["title"], "score": p["score"]}
-                for p in passages
-            ],
-        }, indent=2)
+                "passages_found": len(passages),
+                "results": [
+                    {"doc_id": p["doc_id"], "title": p["title"], "score": p["score"]}
+                    for p in passages
+                ],
+            },
+            indent=2,
+        )
 
     # STEP 3.6: Build Agent — Bio retriever with retrieve_bio_papers tool
     return Agent(model=model, system_prompt=system_prompt, tools=[retrieve_bio_papers])
 
 
 # STEP 4: RESULT AGGREGATION — Combine, dedupe, and rank retrieved passages
-def aggregate_results(cs_passages: list, bio_passages: list, top_k: int = TOP_K) -> list[dict]:
+def aggregate_results(
+    cs_passages: list, bio_passages: list, top_k: int = TOP_K
+) -> list[dict]:
     """
     THE KEY PATTERN: Merge, deduplicate, and rank passages from both KBs.
 
@@ -444,7 +553,9 @@ def aggregate_results(cs_passages: list, bio_passages: list, top_k: int = TOP_K)
 def build_synthesis_agent(passages: list[dict], query: str) -> Agent:
     """Produces grounded research summary with citations from top passages."""
     # STEP 5.1: BedrockModel — Nova Pro for synthesis (temperature 0.2)
-    model = BedrockModel(model_id=NOVA_PRO_MODEL, region_name=AWS_REGION, temperature=0.2)
+    model = BedrockModel(
+        model_id=NOVA_PRO_MODEL, region_name=AWS_REGION, temperature=0.2
+    )
 
     # Format passages for the synthesis prompt
     formatted = "\n\n".join(
@@ -504,7 +615,7 @@ def run_rag_query(query_data: dict):
 
     retrieval_results["cs"] = []
     retrieval_results["bio"] = []
-    print(f"\n  Dispatching 2 retrievers in parallel...")
+    print("\n  Dispatching 2 retrievers in parallel...")
     t_start = time.time()
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -512,12 +623,12 @@ def run_rag_query(query_data: dict):
             executor.submit(
                 run_agent_with_retry,
                 lambda: build_cs_retriever(query),
-                f"Search for: {query}"
+                f"Search for: {query}",
             ): "CS",
             executor.submit(
                 run_agent_with_retry,
                 lambda: build_bio_retriever(query),
-                f"Search for: {query}"
+                f"Search for: {query}",
             ): "Bio",
         }
 
@@ -538,7 +649,7 @@ def run_rag_query(query_data: dict):
     top_passages = aggregate_results(retrieval_results["cs"], retrieval_results["bio"])
 
     if not top_passages:
-        print(f"    No relevant passages found — skipping synthesis")
+        print("    No relevant passages found — skipping synthesis")
         return {
             "query": query,
             "cs_passages": 0,
@@ -552,10 +663,10 @@ def run_rag_query(query_data: dict):
         print(f"      [{p['doc_id']}] {p['title'][:50]}... (score: {p['score']})")
     avg_score = round(sum(p["score"] for p in top_passages) / len(top_passages), 3)
     print(f"    Avg score: {avg_score}")
-    print(f"\n  SynthesisAgent...")
+    print("\n  SynthesisAgent...")
     t_synth = run_agent_with_retry(
         lambda: build_synthesis_agent(top_passages, query),
-        f"Answer the research question: {query}"
+        f"Answer the research question: {query}",
     )
     print(f"    Time: {t_synth:.1f}s")
 
@@ -574,6 +685,7 @@ def run_rag_query(query_data: dict):
 #  STEP 7: DEMO EXECUTION — Run 3 RAG query scenarios
 # ═══════════════════════════════════════════════════════
 
+
 def _verify_kb_ids():
     """Fail fast if the learner hasn't configured CS_KB_ID / BIO_KB_ID.
 
@@ -581,7 +693,11 @@ def _verify_kb_ids():
     check catches the most common setup mistake (forgotten .env) before the
     first query runs — not in the middle of a scenario.
     """
-    missing = [name for name, val in [("CS_KB_ID", CS_KB_ID), ("BIO_KB_ID", BIO_KB_ID)] if not val]
+    missing = [
+        name
+        for name, val in [("CS_KB_ID", CS_KB_ID), ("BIO_KB_ID", BIO_KB_ID)]
+        if not val
+    ]
     if missing:
         print("\n" + "=" * 70)
         print("  SETUP REQUIRED: Bedrock Knowledge Base IDs not set")
@@ -607,37 +723,43 @@ def main():
 
     for i, query_data in enumerate(QUERIES):
         print(f"\n{'━' * 70}")
-        print(f"  QUERY {i + 1}: \"{query_data['query']}\"")
+        print(f'  QUERY {i + 1}: "{query_data["query"]}"')
         print(f"  {query_data['description']}")
-        print(f"  Expected: {', '.join(query_data['expected_domains']) or 'no results'}")
+        print(
+            f"  Expected: {', '.join(query_data['expected_domains']) or 'no results'}"
+        )
         print(f"{'━' * 70}")
 
         result = run_rag_query(query_data)
         results.append(result)
 
-        print(f"\n  Results: CS={result['cs_passages']} Bio={result['bio_passages']} Top-K={result['top_passages']} Score={result['avg_score']}")
+        print(
+            f"\n  Results: CS={result['cs_passages']} Bio={result['bio_passages']} Top-K={result['top_passages']} Score={result['avg_score']}"
+        )
 
     print(f"\n{'═' * 70}")
     print("SUMMARY")
     print(f"{'═' * 70}")
 
     for r in results:
-        total = r['cs_passages'] + r['bio_passages']
+        total = r["cs_passages"] + r["bio_passages"]
         status = "✓" if total > 0 else "○"
-        print(f"  {status} \"{r['query'][:50]}...\"")
-        print(f"    Passages: {total} (CS={r['cs_passages']}, Bio={r['bio_passages']}), "
-              f"Top-K: {r['top_passages']}, Avg score: {r['avg_score']}")
+        print(f'  {status} "{r["query"][:50]}..."')
+        print(
+            f"    Passages: {total} (CS={r['cs_passages']}, Bio={r['bio_passages']}), "
+            f"Top-K: {r['top_passages']}, Avg score: {r['avg_score']}"
+        )
 
-    print(f"\n  Key Insights:")
-    print(f"  1. SPECIALIZED RETRIEVERS — each owns one KB with focused embeddings")
-    print(f"  2. PARALLEL RETRIEVAL — both KBs searched simultaneously")
-    print(f"  3. RELEVANCE SCORING — passages ranked by confidence score")
-    print(f"     Production: Bedrock KB returns score per retrievalResult")
-    print(f"  4. TOP-K SELECTION — only best passages go to synthesis")
-    print(f"  5. GROUNDED SYNTHESIS — every claim cites [DOC_ID]")
-    print(f"     Production: SynthesisAgent's system prompt enforces citations")
-    print(f"  6. GRACEFUL DEGRADATION — partial results > no results")
-    print(f"     If one retriever fails, synthesis uses available passages\n")
+    print("\n  Key Insights:")
+    print("  1. SPECIALIZED RETRIEVERS — each owns one KB with focused embeddings")
+    print("  2. PARALLEL RETRIEVAL — both KBs searched simultaneously")
+    print("  3. RELEVANCE SCORING — passages ranked by confidence score")
+    print("     Production: Bedrock KB returns score per retrievalResult")
+    print("  4. TOP-K SELECTION — only best passages go to synthesis")
+    print("  5. GROUNDED SYNTHESIS — every claim cites [DOC_ID]")
+    print("     Production: SynthesisAgent's system prompt enforces citations")
+    print("  6. GRACEFUL DEGRADATION — partial results > no results")
+    print("     If one retriever fails, synthesis uses available passages\n")
 
 
 if __name__ == "__main__":
