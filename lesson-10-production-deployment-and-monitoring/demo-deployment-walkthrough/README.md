@@ -60,3 +60,41 @@ aws cloudformation delete-stack --stack-name lesson-10-demo-runtime
 Do not delete a CLI-managed runtime individually in the AgentCore console.
 The shared `CDKToolkit` bootstrap stack may be used by other activities; leave it in place.
 For a different student account or region, start with a fresh copy of this activity.
+
+# Local AgentCore CLI Setup
+
+This walkthrough requires **AgentCore CLI 0.30.0**, distributed through the npm package `@aws/agentcore`.
+
+The Python package `bedrock-agentcore-starter-toolkit` provides a different CLI interface and is not compatible with the deployment helper used in this lesson.
+
+Install the required CLI locally:
+
+```bash
+npm install --no-save --package-lock=false @aws/agentcore@0.30.0
+```
+
+Make the local executable available to the Python deployment helper:
+
+```bash
+export PATH="$PWD/node_modules/.bin:$PATH"
+```
+
+Verify the CLI and validate the project configuration:
+
+```bash
+agentcore --version
+agentcore validate
+```
+
+Expected results:
+
+- CLI version: `0.30.0`
+- Configuration validation: `Valid`
+
+Once the supporting CloudFormation stack is deployed and AWS credentials are configured, continue with:
+
+```bash
+python deployment_walkthrough.py
+```
+
+**Note:** `node_modules/`, `.cache/`, and local deployment state must not be committed. The deployed AWS resources must be cleaned up after completing the exercise.

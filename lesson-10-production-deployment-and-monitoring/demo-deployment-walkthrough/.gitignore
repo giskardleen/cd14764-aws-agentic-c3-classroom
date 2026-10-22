@@ -5,3 +5,6 @@ agentcore/cdk/node_modules/
 agentcore/cdk/cdk.out/
 agentcore/cdk/dist/
 agentcore/.env*
+node_modules/
+.DS_Store
+agentcore/.cache/
