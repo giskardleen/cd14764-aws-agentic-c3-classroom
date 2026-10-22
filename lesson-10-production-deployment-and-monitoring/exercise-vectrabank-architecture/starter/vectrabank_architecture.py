@@ -29,20 +29,44 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
+# Supporting resources are provisioned separately from the CLI runtime stack.
+_RESOURCES = agentcore_cli.load_resources("lesson-10-exercise")
+_ROLE_ARN = _RESOURCES["AgentCoreRoleArn"]
+_GUARDRAIL_ID = _RESOURCES["GuardrailId"]
+_GUARDRAIL_VERSION = os.environ.get("GUARDRAIL_VERSION", "DRAFT")
+
 
 # ═══════════════════════════════════════════════════════
 #  VECTRABANK RUNTIME CONFIGURATION
 # ═══════════════════════════════════════════════════════
 
-# TODO 1: Define the AgentCore Runtime configuration
-# Hint: Same structure as demo, but:
-#   - Use networkMode "PUBLIC" and serverProtocol "HTTP" in this lab
-#   - Document private subnets and security groups for a production VPC
-#   - Role and guardrail IDs are discovered by the provided helper
-#   - Environment variables: 3 KB IDs, state table, audit table, region, log level
 VECTRABANK_RUNTIME_CONFIG = {
     "agentRuntimeName": "vectrabank-financial-services",
-    # Replace with full config...
+    "description": "Multi-agent financial services system with RAG, guardrails, and compliance",
+    "networkConfiguration": {
+        # Production should use VPC mode with private subnet and security group IDs.
+        "networkMode": "PUBLIC",
+    },
+    "protocolConfiguration": {
+        "serverProtocol": "HTTP",
+    },
+
+    "guardrailConfiguration": {
+        "guardrailIdentifier": _GUARDRAIL_ID,
+        "guardrailVersion": _GUARDRAIL_VERSION,
+    },
+
+    "environmentVariables": {
+        "MARKET_DATA_KB_ID": "KB-MARKET-DATA-001",
+        "COMPLIANCE_KB_ID": "KB-COMPLIANCE-002",
+        "PRODUCTS_KB_ID": "KB-PRODUCTS-003",
+        "STATE_TABLE_NAME": "vectrabank-agent-state",
+        "AUDIT_TABLE_NAME": "vectrabank-audit-log",
+        "AWS_REGION": os.environ.get("AWS_REGION", "us-east-1"),
+        "LOG_LEVEL": "INFO",
+        "ENVIRONMENT": "production",
+        "ENABLE_XRAY": "true",
+    },
 }
 
 
@@ -50,12 +74,43 @@ VECTRABANK_RUNTIME_CONFIG = {
 #  AGENT DEFINITIONS
 # ═══════════════════════════════════════════════════════
 
-# TODO 2: Define 4 agents for VectraBank
-# Hint: QueryRouter (Nova Lite), MarketDataRetriever (Nova Lite),
-#       ComplianceRetriever (Nova Lite), FinancialAdvisor (Claude Sonnet)
-#   Each needs: name, model, temperature, role, tools, estimated_tokens, requests_per_day
 VECTRABANK_AGENTS = [
-    # Replace with 4 agent definitions...
+    {
+        "name": "QueryRouter",
+        "model": "amazon.nova-lite-v1:0",
+        "temperature": 0.0,
+        "role": "Classify incoming financial queries and route to specialist",
+        "tools": ["classify_query", "check_priority"],
+        "estimated_tokens_per_request": 400,
+        "requests_per_day": 10000,
+    },
+    {
+        "name": "MarketDataRetriever",
+        "model": "amazon.nova-lite-v1:0",
+        "temperature": 0.0,
+        "role": "Retrieve market data and financial reports from KB",
+        "tools": ["retrieve_market_data"],
+        "estimated_tokens_per_request": 600,
+        "requests_per_day": 6000,
+    },
+    {
+        "name": "ComplianceRetriever",
+        "model": "amazon.nova-lite-v1:0",
+        "temperature": 0.0,
+        "role": "Retrieve SEC/FINRA regulations and compliance guidelines from KB",
+        "tools": ["retrieve_compliance_docs"],
+        "estimated_tokens_per_request": 600,
+        "requests_per_day": 4000,
+    },
+    {
+        "name": "FinancialAdvisor",
+        "model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "temperature": 0.1,
+        "role": "Synthesize retrieved data into grounded financial analysis with citations",
+        "tools": [],
+        "estimated_tokens_per_request": 2500,
+        "requests_per_day": 10000,
+    },
 ]
 
 
@@ -63,25 +118,63 @@ VECTRABANK_AGENTS = [
 #  MONITORING STRATEGY
 # ═══════════════════════════════════════════════════════
 
-# TODO 3: Define the monitoring dashboard (6 widgets)
-# Hint: Total Queries, Latency P50/P99, Error Rate (2% threshold),
-#       Guardrail Blocks, RAG Quality (NEW), Kill Switch Status (NEW)
-
-# TODO 4: Define 3 alarms with thresholds
-# Hint: HighErrorRate (2%), HighLatencyP99 (8s), GuardrailViolationSpike (50 blocks/5min)
-
-# TODO 5: Define X-Ray tracing config
-# Hint: 10% sampling for financial audit, annotations for query_type, agent_name, etc.
 VECTRABANK_MONITORING = {
     "dashboard_name": "vectrabank-financial-services",
-    "widgets": [],   # Replace with 6 widget definitions
-    "alarms": [],    # Replace with 3 alarm definitions
-    "xray_tracing": {},  # Replace with tracing config
+    "widgets": [
+        {"title": "Total Queries", "type": "line", "metric": "AgentCore/Invocations",
+         "period": 60, "stat": "Sum"},
+        {"title": "Latency P50/P99", "type": "line",
+         "metrics": [
+             {"name": "AgentCore/Latency", "stat": "p50"},
+             {"name": "AgentCore/Latency", "stat": "p99"},
+         ], "period": 60},
+        {"title": "Error Rate", "type": "number", "metric": "AgentCore/Errors",
+         "period": 300, "stat": "Average", "threshold": 0.02},
+        {"title": "Guardrail Blocks by Policy", "type": "stacked_bar",
+         "metrics": [
+             {"name": "Guardrail/PIIBlocks", "label": "PII"},
+             {"name": "Guardrail/TopicBlocks", "label": "Topic"},
+             {"name": "Guardrail/ContentBlocks", "label": "Content"},
+         ], "period": 300},
+        {"title": "RAG Retrieval Quality", "type": "line",
+         "metric": "Custom/AvgRelevanceScore", "period": 300, "stat": "Average"},
+        {"title": "Kill Switch Status", "type": "indicator",
+         "metric": "Custom/KillSwitchActive", "period": 60},
+    ],
+    "alarms": [
+        {
+            "name": "HighErrorRate",
+            "metric": "AgentCore/Errors",
+            "threshold": 0.02,
+            "period": 300,
+            "action": "SNS → kill-switch-topic → Lambda disables runtime",
+        },
+        {
+            "name": "HighLatencyP99",
+            "metric": "AgentCore/Latency",
+            "stat": "p99",
+            "threshold": 8.0,
+            "period": 300,
+            "action": "SNS → ops-team-pager",
+        },
+        {
+            "name": "GuardrailViolationSpike",
+            "metric": "Guardrail/TotalBlocks",
+            "threshold": 50,
+            "period": 300,
+            "action": "SNS → security-team + rate-limit-increase",
+        },
+    ],
+    "xray_tracing": {
+        "enabled": True,
+        "sampling_rate": 0.10,
+        "annotations": ["query_type", "agent_name", "model_id", "customer_tier"],
+    },
 }
 
 
 # ═══════════════════════════════════════════════════════
-#  COST ESTIMATION (provided — same as demo)
+#  COST ESTIMATION (provided)
 # ═══════════════════════════════════════════════════════
 
 MODEL_PRICING = {
@@ -114,79 +207,45 @@ def estimate_monthly_costs(agents: list, days: int = 30) -> dict:
         }
         total += monthly_cost
 
-    # TODO 6: Add infrastructure costs
-    # Hint: DynamoDB (2 tables), Knowledge Bases (3 KBs), CloudWatch + X-Ray, VPC
-    # Add each as costs["name"] = {"monthly_cost": estimated_cost}
     infrastructure_costs = {
-        "dynamodb": {
-            "table_state": 0.0,  # TODO 6a: State table (transactions, reads/writes)
-            "table_audit": 0.0,  # TODO 6b: Audit log table (compliance requirement)
-        },
-        "knowledge_bases": {
-            "market_data_kb": 0.0,  # TODO 6c: Market data retrieval KB
-            "compliance_kb": 0.0,   # TODO 6d: Compliance & regulatory KB
-            "risk_assessment_kb": 0.0,  # TODO 6e: Risk assessment KB
-        },
-        "cloudwatch": {
-            "logs": 0.0,  # TODO 6f: CloudWatch Logs ingestion/storage
-            "metrics": 0.0,  # TODO 6g: Custom metrics
-            "dashboard": 0.0,  # TODO 6h: Dashboard
-        },
-        "xray": {
-            "sampling_and_analysis": 0.0,  # TODO 6i: 10% sampling rate
-        },
-        "vpc": {
-            "nat_gateway": 0.0,  # TODO 6j: VPC NAT gateway (outbound traffic)
-            "vpc_endpoints": 0.0,  # TODO 6k: VPC endpoints for Bedrock, S3
-        },
+        "DynamoDB (2 tables)": 50.0,
+        "Knowledge Bases (3 KBs)": 30.0,
+        "CloudWatch + X-Ray": 25.0,
+        "VPC/Networking": 10.0,
     }
-
-    # TODO 6l: Calculate total infrastructure costs and add to costs dict
-    # Example: costs["DynamoDB"] = {"monthly_cost": sum of dynamodb costs}
-    #         costs["Knowledge Bases"] = {"monthly_cost": sum of KB costs}
-    #         etc.
-    # Then add infrastructure total to `total` before computing TOTAL below:
-    infra_total = sum(
-        cost for category in infrastructure_costs.values()
-        for cost in category.values()
-    )
-    total += infra_total
+    for name, monthly_cost in infrastructure_costs.items():
+        costs[name] = {"monthly_cost": monthly_cost}
+        total += monthly_cost
 
     costs["TOTAL"] = {"monthly_cost": round(total, 2)}
     return costs
 
 
 # ═══════════════════════════════════════════════════════
-#  OPERATIONAL RUNBOOK (NEW — not in demo)
+#  OPERATIONAL RUNBOOK
 # ═══════════════════════════════════════════════════════
 
-# TODO 7: Define 4 operational runbook procedures
-# Hint: Each is a dict with "name", "steps" (list of strings), and procedure-specific fields
-#   1. Deploy a New Version — test, update guardrail, deploy runtime, smoke test, monitor
-#   2. Rollback — identify previous version, update runtime, verify, post-mortem
-#   3. Kill Switch Triggered — acknowledge, check audit log, investigate, fix, re-enable
-#   4. Latency Investigation — X-Ray map, per-agent latency, identify bottleneck, scale
 OPERATIONAL_RUNBOOK = {
     "deploy": {
         "name": "Production Deployment",
         "steps": [
-            # TODO 7a: Add step 1 (run test suite)
-            # TODO 7b: Add step 2 (validate guardrail configuration)
-            # TODO 7c: Add step 3 (deploy new runtime version)
-            # TODO 7d: Add step 4 (run smoke tests on 10 test transactions)
-            # TODO 7e: Add step 5 (monitor error rate and latency for 5 minutes)
+            "Run the full test suite",
+            "Validate the guardrail configuration",
+            "Deploy the new runtime version",
+            "Run smoke tests on 10 test transactions",
+            "Monitor error rate and latency for 5 minutes",
         ],
-        "rollback_trigger": "",  # TODO 7f: Under what condition do we rollback? (e.g., "Error rate > 2%")
+        "rollback_trigger": "Error rate > 2%",
         "estimated_duration_minutes": 15,  # Estimate time to complete
     },
 
     "rollback": {
         "name": "Emergency Rollback",
         "steps": [
-            # TODO 7g: Add step 1 (identify previous stable runtime version)
-            # TODO 7h: Add step 2 (revert runtime to previous version)
-            # TODO 7i: Add step 3 (verify agents are responding to transactions)
-            # TODO 7j: Add step 4 (post-incident review - what went wrong?)
+            "Identify the previous stable runtime version",
+            "Revert the runtime to the previous version",
+            "Verify agents are responding to transactions",
+            "Conduct a post-incident review to determine what went wrong",
         ],
         "estimated_duration_minutes": 10,
     },
@@ -194,13 +253,13 @@ OPERATIONAL_RUNBOOK = {
     "kill_switch": {
         "name": "Kill Switch Activation",
         "steps": [
-            # TODO 7k: Add step 1 (acknowledge alert in PagerDuty)
-            # TODO 7l: Add step 2 (check AWS X-Ray for error patterns)
-            # TODO 7m: Add step 3 (check CloudWatch audit logs for anomalies)
-            # TODO 7n: Add step 4 (disable runtime if attack/fraud detected)
-            # TODO 7o: Add step 5 (notify compliance team)
+            "Acknowledge the alert in PagerDuty",
+            "Check AWS X-Ray for error patterns",
+            "Check CloudWatch audit logs for anomalies",
+            "Disable the runtime if an attack or fraud is detected",
+            "Notify the compliance team",
         ],
-        "threshold": "",  # TODO 7p: What metric threshold triggers this? (e.g., "Guardrail blocks > 50/5min")
+        "threshold": "Guardrail blocks > 50/5min",
         "requires_approval": True,  # Financial system requires human approval
         "estimated_duration_minutes": 5,
     },
@@ -208,11 +267,11 @@ OPERATIONAL_RUNBOOK = {
     "latency_investigation": {
         "name": "High Latency Investigation",
         "steps": [
-            # TODO 7q: Add step 1 (pull X-Ray service map to identify slow service)
-            # TODO 7r: Add step 2 (check per-agent latency in CloudWatch)
-            # TODO 7s: Add step 3 (identify bottleneck - agent, KB, or knowledge base retrieval?)
-            # TODO 7t: Add step 4 (check DynamoDB throttling or KB latency)
-            # TODO 7u: Add step 5 (scale the bottleneck component - more provisioned capacity?)
+            "Pull the X-Ray service map to identify the slow service",
+            "Check per-agent latency in CloudWatch",
+            "Identify whether the bottleneck is an agent or knowledge base retrieval",
+            "Check for DynamoDB throttling or knowledge base latency",
+            "Scale the bottleneck component by increasing provisioned capacity",
         ],
         "trigger_threshold": "P99 latency > 8 seconds",
         "estimated_duration_minutes": 20,
@@ -249,10 +308,43 @@ def main():
     print("  1. AgentCore Runtime Configuration")
     print(f"{'━' * 70}")
 
-    # TODO 8: Print the runtime config, agent definitions, monitoring strategy,
-    #         cost estimates, and operational runbook
-    # Hint: Follow the demo's main() output format
-    print("  [Complete TODOs 1-7 to populate this output]")
+    cfg = VECTRABANK_RUNTIME_CONFIG
+    print(f"  Runtime:   {cfg['agentRuntimeName']}")
+    print(f"  Network:   {cfg['networkConfiguration']['networkMode']}")
+    print(f"  Protocol:  {cfg['protocolConfiguration']['serverProtocol']}")
+    guardrail = cfg["guardrailConfiguration"]
+    print(f"  Guardrail: {guardrail['guardrailIdentifier']} "
+          f"v{guardrail['guardrailVersion']}")
+    print("  Environment Variables:")
+    for key, value in cfg["environmentVariables"].items():
+        print(f"    {key}: {value}")
+
+    print(f"\n{'━' * 70}")
+    print(f"  2. Agent Definitions ({len(VECTRABANK_AGENTS)} agents)")
+    print(f"{'━' * 70}")
+    for agent in VECTRABANK_AGENTS:
+        print(f"\n  {agent['name']}:")
+        print(f"    Model:       {agent['model']}")
+        print(f"    Temperature: {agent['temperature']}")
+        print(f"    Role:        {agent['role']}")
+        print(f"    Daily reqs:  {agent['requests_per_day']:,}")
+
+    print(f"\n{'━' * 70}")
+    print("  3. Monitoring Strategy")
+    print(f"{'━' * 70}")
+    monitoring = VECTRABANK_MONITORING
+    print(f"\n  Dashboard: {monitoring['dashboard_name']} "
+          f"({len(monitoring['widgets'])} widgets)")
+    for widget in monitoring["widgets"]:
+        print(f"    [{widget['type']:12s}] {widget['title']}")
+    print(f"\n  Alarms ({len(monitoring['alarms'])}):")
+    for alarm in monitoring["alarms"]:
+        print(f"    {alarm['name']}: threshold={alarm['threshold']}, "
+              f"period={alarm['period']}s")
+        print(f"      -> {alarm['action']}")
+    tracing = monitoring["xray_tracing"]
+    print(f"\n  X-Ray: sampling={tracing['sampling_rate'] * 100:.0f}%, "
+          f"annotations={', '.join(tracing['annotations'])}")
 
     if VECTRABANK_AGENTS:
         # ── Cost Estimation ──
@@ -268,6 +360,14 @@ def main():
             model = data.get("model", "—")
             cost = data["monthly_cost"]
             print(f"  {name:<25s} {model:<40s} ${cost:>9.2f}")
+
+    print(f"\n{'━' * 70}")
+    print(f"  5. Operational Runbook ({len(OPERATIONAL_RUNBOOK)} procedures)")
+    print(f"{'━' * 70}")
+    for runbook in OPERATIONAL_RUNBOOK.values():
+        print(f"\n  {runbook['name']}")
+        for step in runbook["steps"]:
+            print(f"    {step}")
 
     print(f"\n  Key Takeaways:")
     print(f"  1. VPC NETWORK MODE — financial services agents stay internal")
