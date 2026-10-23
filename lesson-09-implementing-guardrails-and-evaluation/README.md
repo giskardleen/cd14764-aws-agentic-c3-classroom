@@ -15,16 +15,10 @@ lesson-09-implementing-guardrails-and-evaluation/
 │   ├── infrastructure/stack.yaml         ← Healthcare guardrail
 │   └── healthcare_guardrails.py
 └── exercise-trading-compliance/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/stack.yaml     ← Trading guardrail
-    │   └── trading_compliance.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/stack.yaml     ← same as starter; deploy only if you skipped the starter
-        └── trading_compliance.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/stack.yaml     ← Trading guardrail
+    └── trading_compliance.py
 ```
 
 - **Demo (healthcare):** 4 policy types (content, PII, topic, word), kill switch, rate limiting, audit log.

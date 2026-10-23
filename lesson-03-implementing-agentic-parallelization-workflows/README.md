@@ -14,14 +14,9 @@ lesson-03-implementing-agentic-parallelization-workflows/
 │   ├── .env.example
 │   └── document_analysis.py
 └── exercise-contract-compliance/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   └── contract_compliance.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        └── contract_compliance.py
+    ├── README.md
+    ├── .env.example
+    └── contract_compliance.py
 ```
 
 ## Demo: Parallel Document Analysis with Specialist Agents (Instructor-led)

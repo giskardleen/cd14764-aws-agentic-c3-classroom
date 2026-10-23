@@ -14,14 +14,9 @@ lesson-04-implementing-agent-orchestration/
 │   ├── .env.example
 │   └── hr_onboarding.py
 └── exercise-package-delivery/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   └── delivery_workflow.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        └── delivery_workflow.py
+    ├── README.md
+    ├── .env.example
+    └── delivery_workflow.py
 ```
 
 ## Demo: HR Employee Onboarding Orchestration (Instructor-led)

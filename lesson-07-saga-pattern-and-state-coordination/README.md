@@ -15,16 +15,10 @@ lesson-07-saga-pattern-and-state-coordination/
 │   ├── infrastructure/stack.yaml         ← SagaState table
 │   └── travel_booking_saga.py
 └── exercise-ecommerce-checkout/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/stack.yaml     ← CheckoutSaga table
-    │   └── ecommerce_checkout_saga.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/stack.yaml     ← same as starter; deploy only if you skipped the starter
-        └── ecommerce_checkout_saga.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/stack.yaml     ← CheckoutSaga table
+    └── ecommerce_checkout_saga.py
 ```
 
 - **Demo (travel booking):** 3 booking agents (flight, hotel, car), saga orchestrator with reverse-order compensation, DynamoDB state machine.

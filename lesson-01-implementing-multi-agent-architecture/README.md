@@ -15,14 +15,10 @@ lesson-01-implementing-multi-agent-architecture/
 │   ├── architecture.svg
 │   └── healthcare_triage.py
 └── exercise-smart-home-device-mgmt/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   └── smart_home_device_mgmt.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        └── smart_home_device_mgmt.py
+    ├── README.md
+    ├── .env.example
+    ├── architecture.svg
+    └── smart_home_device_mgmt.py
 ```
 
 ## Demo: Healthcare Triage System (Instructor-led)

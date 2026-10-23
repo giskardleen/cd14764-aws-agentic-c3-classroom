@@ -1,11 +1,10 @@
 # Lesson 10 — Production Deployment and Monitoring
 
-The demo, exercise starter and solution use AgentCore CLI 0.30.0 for runtime deployment.
+The demo and exercise use AgentCore CLI 0.30.0 for runtime deployment.
 Open the activity README for setup, invocation and cleanup:
 
 - [Insurance claims demo](demo-deployment-walkthrough/README.md)
-- [VectraBank starter](exercise-vectrabank-architecture/starter/README.md)
-- [VectraBank solution](exercise-vectrabank-architecture/solution/README.md)
+- [VectraBank exercise](exercise-vectrabank-architecture/README.md)
 
 Each activity is self-contained: `agentcore_cli.py` provides deployment support,
 `agentcore/` holds CLI configuration, `runtime/` contains the HTTP smoke-test endpoint,

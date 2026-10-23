@@ -19,18 +19,12 @@ lesson-11-inter-agent-communication-via-gateway/
 │   │   └── stack.yaml                    ← 4 supply-chain Lambdas + AgentCore role
 │   └── supply_chain_gateway.py
 └── exercise-analytics-gateway/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/
-    │   │   ├── deploy_stack.py
-    │   │   └── stack.yaml                ← 4 analytics Lambdas + AgentCore role
-    │   └── analytics_gateway.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/               ← same as starter; deploy only if you skipped the starter
-        └── analytics_gateway.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/
+    │   ├── deploy_stack.py
+    │   └── stack.yaml                ← 4 analytics Lambdas + AgentCore role
+    └── analytics_gateway.py
 ```
 
 - **Demo (supply chain):** 4 Lambda targets (inventory, shipping, supplier, quality inspection), dynamic registration of the 4th tool, live `create_gateway` API.

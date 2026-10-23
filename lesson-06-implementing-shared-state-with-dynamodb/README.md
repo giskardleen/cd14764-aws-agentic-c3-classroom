@@ -15,16 +15,10 @@ lesson-06-implementing-shared-state-with-dynamodb/
 │   ├── infrastructure/stack.yaml      ← TripState table
 │   └── ride_sharing_state.py
 └── exercise-food-delivery/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/stack.yaml  ← OrderState table
-    │   └── food_delivery_state.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/stack.yaml  ← same as starter; deploy only if you skipped the starter
-        └── food_delivery_state.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/stack.yaml  ← OrderState table
+    └── food_delivery_state.py
 ```
 
 - **Demo (ride-sharing):** 3 worker agents updating the same trip record with optimistic locking, plus cross-session memory for preferred drivers.

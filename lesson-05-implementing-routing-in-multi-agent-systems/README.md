@@ -15,16 +15,10 @@ lesson-05-implementing-routing-in-multi-agent-systems/
 │   ├── infrastructure/stack.yaml         ← demo routing-audit table
 │   └── financial_router.py
 └── exercise-telecom-router/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/stack.yaml     ← exercise routing-audit table
-    │   └── telecom_router.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/stack.yaml     ← same as starter; deploy only if you skipped the starter
-        └── telecom_router.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/stack.yaml     ← exercise routing-audit table
+    └── telecom_router.py
 ```
 
 - **Demo (financial transactions):** 5 specialist agents + 1 LLM classifier, hybrid router with priority/rule/LLM/fallback paths.

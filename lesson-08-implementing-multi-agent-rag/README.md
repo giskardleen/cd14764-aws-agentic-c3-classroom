@@ -16,18 +16,11 @@ lesson-08-implementing-multi-agent-rag/
 │   ├── seed_documents.py                 ← seeds cs/ and bio/ prefixes
 │   └── research_assistant_rag.py
 └── exercise-clinical-literature/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   ├── infrastructure/stack.yaml     ← S3 bucket for Drug + Guidelines docs
-    │   ├── seed_documents.py             ← seeds drugs/ and guidelines/ prefixes
-    │   └── clinical_literature_rag.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        ├── infrastructure/stack.yaml     ← same as starter; deploy only if you skipped the starter
-        ├── seed_documents.py             ← same as starter
-        └── clinical_literature_rag.py
+    ├── README.md
+    ├── .env.example
+    ├── infrastructure/stack.yaml     ← S3 bucket for Drug + Guidelines docs
+    ├── seed_documents.py             ← seeds drugs/ and guidelines/ prefixes
+    └── clinical_literature_rag.py
 ```
 
 - **Demo (research assistant):** 2 retrievers — Computer Science papers + Biology papers — parallel retrieval, synthesis with `[DOC_ID]` citations.

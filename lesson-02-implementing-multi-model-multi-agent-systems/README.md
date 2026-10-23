@@ -14,14 +14,9 @@ lesson-02-implementing-multi-model-multi-agent-systems/
 │   ├── .env.example
 │   └── incident_response.py
 └── exercise-content-moderation-pipeline/
-    ├── starter/
-    │   ├── README.md
-    │   ├── .env.example
-    │   └── content_moderation.py
-    └── solution/
-        ├── README.md
-        ├── .env.example
-        └── content_moderation.py
+    ├── README.md
+    ├── .env.example
+    └── content_moderation.py
 ```
 
 ## Demo: Multi-Model Incident Response (Instructor-led)
