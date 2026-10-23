@@ -38,10 +38,11 @@ Production equivalent: Amazon Bedrock AgentCore Gateway (MCP protocol)
 """
 
 import json
+import logging
 import os
 import re
 import time
-import logging
+
 import boto3
 from dotenv import load_dotenv
 from strands import Agent, tool
@@ -53,7 +54,9 @@ logging.basicConfig(level=logging.WARNING)
 
 def clean_response(text: str) -> str:
     """Strip <thinking>...</thinking> tags from Nova model outputs."""
-    return re.sub(r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL).strip()
+    return re.sub(
+        r"<thinking>.*?</thinking>\s*", "", str(text), flags=re.DOTALL
+    ).strip()
 
 
 # NOTE: In production, extract shared helpers like run_agent_with_retry() and
@@ -69,11 +72,15 @@ def run_agent_with_retry(agent_builder, prompt: str, max_retries: int = 3) -> fl
             return time.time() - t
         except Exception as e:
             if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s...")
+                wait = 2**attempt
+                print(
+                    f"    [Retry {attempt + 1}/{max_retries}] {e.__class__.__name__}, waiting {wait}s..."
+                )
                 time.sleep(wait)
             else:
-                print(f"    [Failed] {e.__class__.__name__} after {max_retries} attempts")
+                print(
+                    f"    [Failed] {e.__class__.__name__} after {max_retries} attempts"
+                )
                 raise
 
 
@@ -90,11 +97,14 @@ lambda_client = boto3.client("lambda", region_name=AWS_REGION)
 INVENTORY_FUNCTION = os.environ.get("INVENTORY_FUNCTION", "lesson-11-demo-inventory")
 SHIPPING_FUNCTION = os.environ.get("SHIPPING_FUNCTION", "lesson-11-demo-shipping")
 SUPPLIER_FUNCTION = os.environ.get("SUPPLIER_FUNCTION", "lesson-11-demo-supplier")
-QUALITY_INSPECTION_FUNCTION = os.environ.get("QUALITY_INSPECTION_FUNCTION", "lesson-11-demo-quality-inspection")
+QUALITY_INSPECTION_FUNCTION = os.environ.get(
+    "QUALITY_INSPECTION_FUNCTION", "lesson-11-demo-quality-inspection"
+)
 
 
 # STEP 1: LAMBDA GATEWAY — Routes tool calls to AWS Lambda functions
 # Production equivalent: Amazon Bedrock AgentCore Gateway (MCP protocol)
+
 
 class LambdaGateway:
     """Gateway that routes tool calls to AWS Lambda functions.
@@ -113,8 +123,13 @@ class LambdaGateway:
         self.targets = {}  # name → {description, function_name, target_type}
         self.invocation_log = []
 
-    def register_target(self, name: str, description: str, function_name: str,
-                        target_type: str = "lambda"):
+    def register_target(
+        self,
+        name: str,
+        description: str,
+        function_name: str,
+        target_type: str = "lambda",
+    ):
         """Register a Lambda function as a gateway target.
 
         Production: agentcore.create_gateway_target()
@@ -132,12 +147,18 @@ class LambdaGateway:
         """
         tools = []
         for name, config in self.targets.items():
-            if query is None or query.lower() in name.lower() or query.lower() in config["description"].lower():
-                tools.append({
-                    "name": name,
-                    "description": config["description"],
-                    "type": config["target_type"],
-                })
+            if (
+                query is None
+                or query.lower() in name.lower()
+                or query.lower() in config["description"].lower()
+            ):
+                tools.append(
+                    {
+                        "name": name,
+                        "description": config["description"],
+                        "type": config["target_type"],
+                    }
+                )
         return tools
 
     def invoke_tool(self, tool_name: str, params: dict) -> dict:
@@ -146,7 +167,10 @@ class LambdaGateway:
         Production: MCP tool invocation protocol
         """
         if tool_name not in self.targets:
-            return {"status": "error", "message": f"Tool '{tool_name}' not found in gateway"}
+            return {
+                "status": "error",
+                "message": f"Tool '{tool_name}' not found in gateway",
+            }
 
         target = self.targets[tool_name]
         function_name = target["function_name"]
@@ -160,13 +184,15 @@ class LambdaGateway:
 
         result = json.loads(response["Payload"].read().decode("utf-8"))
 
-        self.invocation_log.append({
-            "tool": tool_name,
-            "function": function_name,
-            "params": params,
-            "result_status": result.get("status", "unknown"),
-            "timestamp": time.time(),
-        })
+        self.invocation_log.append(
+            {
+                "tool": tool_name,
+                "function": function_name,
+                "params": params,
+                "result_status": result.get("status", "unknown"),
+                "timestamp": time.time(),
+            }
+        )
 
         return result
 
@@ -180,11 +206,15 @@ class LambdaGateway:
 def build_supply_chain_agent(gateway: LambdaGateway) -> Agent:
     """Build a supply chain agent connected to the Gateway."""
     # STEP 3.1: BedrockModel — Nova Lite for supply chain reasoning (temperature 0.1)
-    model = BedrockModel(model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.1)
+    model = BedrockModel(
+        model_id=NOVA_LITE_MODEL, region_name=AWS_REGION, temperature=0.1
+    )
 
     # List available tools from Gateway
     available_tools = gateway.discover_tools()
-    tool_list = "\n".join(f"  - {t['name']}: {t['description']}" for t in available_tools)
+    tool_list = "\n".join(
+        f"  - {t['name']}: {t['description']}" for t in available_tools
+    )
 
     # STEP 3.2: System prompt — Supply chain management with dynamic tool discovery
     system_prompt = f"""You are a supply chain management agent. You have access to the following
@@ -206,7 +236,9 @@ If a query doesn't match any tool, say so."""
         Returns:
             JSON with inventory data from the Inventory API via Gateway
         """
-        result = gateway.invoke_tool("inventory_api", {"item_id": item_id if item_id != "all" else ""})
+        result = gateway.invoke_tool(
+            "inventory_api", {"item_id": item_id if item_id != "all" else ""}
+        )
         return json.dumps(result, indent=2)
 
     @tool
@@ -220,7 +252,9 @@ If a query doesn't match any tool, say so."""
         Returns:
             JSON with shipment data from the Shipping API via Gateway
         """
-        result = gateway.invoke_tool("shipping_api", {"tracking_id": tracking_id if tracking_id != "all" else ""})
+        result = gateway.invoke_tool(
+            "shipping_api", {"tracking_id": tracking_id if tracking_id != "all" else ""}
+        )
         return json.dumps(result, indent=2)
 
     @tool
@@ -234,7 +268,9 @@ If a query doesn't match any tool, say so."""
         Returns:
             JSON with supplier data from the Supplier API via Gateway
         """
-        result = gateway.invoke_tool("supplier_api", {"supplier_id": supplier_id if supplier_id != "all" else ""})
+        result = gateway.invoke_tool(
+            "supplier_api", {"supplier_id": supplier_id if supplier_id != "all" else ""}
+        )
         return json.dumps(result, indent=2)
 
     @tool
@@ -248,19 +284,24 @@ If a query doesn't match any tool, say so."""
         Returns:
             JSON with inspection data from the Quality Inspection API via Gateway
         """
-        result = gateway.invoke_tool("quality_inspection_api",
-                                     {"item_id": item_id if item_id != "all" else ""})
+        result = gateway.invoke_tool(
+            "quality_inspection_api", {"item_id": item_id if item_id != "all" else ""}
+        )
         return json.dumps(result, indent=2)
 
     # STEP 3.3: Build Agent — bind model + prompt + 4 Gateway-based tools
-    return Agent(model=model, system_prompt=system_prompt,
-                 tools=[check_inventory, track_shipment, lookup_supplier, inspect_quality])
+    return Agent(
+        model=model,
+        system_prompt=system_prompt,
+        tools=[check_inventory, track_shipment, lookup_supplier, inspect_quality],
+    )
 
 
 # STEP 2: AGENTCORE GATEWAY API — Production equivalent of LambdaGateway
 # In production, replace the LambdaGateway class above with Amazon Bedrock
 # AgentCore Gateway. The calls below create the same registry → discover →
 # invoke pattern, managed by AWS over MCP.
+
 
 def _get_function_arn(function_name: str) -> str:
     """Resolve a Lambda function name to its full ARN."""
@@ -278,7 +319,7 @@ def _stack_uuid() -> str:
     naming pattern used for S3 buckets elsewhere in this project.
     """
     cf = boto3.client("cloudformation", region_name=AWS_REGION)
-    stack_info = cf.describe_stacks(StackName="lesson-11-gateway")
+    stack_info = cf.describe_stacks(StackName="lesson-11-demo-gateway")
     stack_id = stack_info["Stacks"][0]["StackId"]
     full_uuid = stack_id.split("/")[-1]
     return full_uuid.split("-")[0]
@@ -299,15 +340,20 @@ def _wait_for_gateway(agentcore, gateway_id: str, timeout: int = 120) -> str:
             print(f" failed: {status}")
             raise RuntimeError(f"Gateway {gateway_id} entered status {status}")
         if first:
-            print("    Gateway provisioning (async — normal AWS behaviour)", end="", flush=True)
+            print(
+                "    Gateway provisioning (async — normal AWS behaviour)",
+                end="",
+                flush=True,
+            )
             first = False
         print(".", end="", flush=True)
         time.sleep(5)
     raise TimeoutError(f"Gateway {gateway_id} still not READY after {timeout}s")
 
 
-def _get_or_create_gateway(agentcore, name: str, role_arn: str,
-                            instructions: str) -> tuple[str, str]:
+def _get_or_create_gateway(
+    agentcore, name: str, role_arn: str, instructions: str
+) -> tuple[str, str]:
     """Create an AgentCore Gateway, or reuse it if it already exists.
 
     Waits for ACTIVE status before returning so callers can immediately
@@ -320,8 +366,9 @@ def _get_or_create_gateway(agentcore, name: str, role_arn: str,
             roleArn=role_arn,
             protocolType="MCP",
             authorizerType="NONE",
-            protocolConfiguration={"mcp": {"instructions": instructions,
-                                            "searchType": "SEMANTIC"}},
+            protocolConfiguration={
+                "mcp": {"instructions": instructions, "searchType": "SEMANTIC"}
+            },
         )
         gw_id = gw["gatewayId"]
         print(f"    Gateway ID  : {gw_id}")
@@ -407,7 +454,9 @@ def create_agentcore_gateway(role_arn: str) -> dict:
 
     print("  Calling create_gateway...")
     gateway_id, gateway_url = _get_or_create_gateway(
-        agentcore, gw_name, role_arn,
+        agentcore,
+        gw_name,
+        role_arn,
         "Supply chain tool gateway. Provides inventory, shipping, supplier, "
         "and quality inspection tools.",
     )
@@ -493,7 +542,7 @@ def main():
     # ── Create Gateway ──
     gateway = LambdaGateway(
         name="supply-chain-gateway",
-        description="Lambda-backed tool gateway for supply chain operations"
+        description="Lambda-backed tool gateway for supply chain operations",
     )
     print(f"\n  Gateway: {gateway.gateway_id}")
     gateway.register_target(
@@ -512,10 +561,10 @@ def main():
         function_name=SUPPLIER_FUNCTION,
     )
 
-    print(f"  Registered 3 targets:")
+    print("  Registered 3 targets:")
     for t in gateway.discover_tools():
         print(f"    [{t['type']:8s}] {t['name']}")
-    print(f"\n  Adding Quality Inspection API (NO code changes)...")
+    print("\n  Adding Quality Inspection API (NO code changes)...")
     gateway.register_target(
         name="quality_inspection_api",
         description="Check quality inspection results, defect rates, and pass/fail status for items",
@@ -526,32 +575,38 @@ def main():
         print(f"    [{t['type']:8s}] {t['name']}")
     for i, test in enumerate(TEST_QUERIES):
         print(f"\n{'━' * 70}")
-        print(f"  QUERY {i + 1}: \"{test['query']}\"")
+        print(f'  QUERY {i + 1}: "{test["query"]}"')
         print(f"  Expected tool: {test['expected_tool']}")
         print(f"  {test['description']}")
         print(f"{'━' * 70}")
 
         elapsed = run_agent_with_retry(
-            lambda: build_supply_chain_agent(gateway),
-            test["query"]
+            lambda: build_supply_chain_agent(gateway), test["query"]
         )
         print(f"    Time: {elapsed:.1f}s")
     print(f"\n{'═' * 70}")
     print("INVOCATION LOG")
     print(f"{'═' * 70}")
     for entry in gateway.invocation_log:
-        print(f"  Tool: {entry['tool']:25s} Lambda: {entry['function']:35s} Status: {entry['result_status']}")
+        print(
+            f"  Tool: {entry['tool']:25s} Lambda: {entry['function']:35s} Status: {entry['result_status']}"
+        )
 
-
-    print(f"\n  Key: 1) PLUGIN ARCH — register APIs 2) DYNAMIC DISCOVERY — no code changes")
-    print(f"       3) SEMANTIC ROUTING — agent selects by description 4) MULTI-TEAM APIs\n")
+    print(
+        "\n  Key: 1) PLUGIN ARCH — register APIs 2) DYNAMIC DISCOVERY — no code changes"
+    )
+    print(
+        "       3) SEMANTIC ROUTING — agent selects by description 4) MULTI-TEAM APIs\n"
+    )
 
     # ── STEP 5: AgentCore Gateway API (Production) ────────────────────────────
     print(f"{'═' * 70}")
     print("STEP 5: AgentCore Gateway API (Production)")
     print(f"{'═' * 70}")
     print("  Replace LambdaGateway with Amazon Bedrock AgentCore Gateway.")
-    print("  These exact API calls register the same tools on a managed MCP endpoint:\n")
+    print(
+        "  These exact API calls register the same tools on a managed MCP endpoint:\n"
+    )
 
     agentcore_role = os.environ.get("AGENTCORE_ROLE_ARN", "")
     if not agentcore_role or agentcore_role.startswith("PASTE"):
@@ -561,13 +616,17 @@ def main():
     else:
         try:
             result = create_agentcore_gateway(agentcore_role)
-            print(f"\n  AgentCore Gateway is live:")
+            print("\n  AgentCore Gateway is live:")
             print(f"    Gateway URL : {result['gateway_url']}")
             print(f"    Status      : {result['status']}")
-            print(f"    Agents connect via MCP at this endpoint — no code changes needed")
+            print(
+                "    Agents connect via MCP at this endpoint — no code changes needed"
+            )
         except Exception as e:
             print(f"  [{e.__class__.__name__}] {e}")
-            print("  (Check AGENTCORE_ROLE_ARN and that the Lambda stack is deployed)\n")
+            print(
+                "  (Check AGENTCORE_ROLE_ARN and that the Lambda stack is deployed)\n"
+            )
 
 
 if __name__ == "__main__":
