@@ -1,35 +1,56 @@
-# Exercise Solution: Analytics Gateway
+# Exercise Starter: Analytics Gateway
 
 ## Architecture
 
 ![Architecture Diagram](architecture.svg)
 
 ## Overview
-This exercise implements an analytics agent connected to utility services through AgentCore Gateway. Same pattern as the demo with mixed target types: 2 Lambda functions and 1 REST API.
+Build an analytics agent connected to utility services through AgentCore Gateway following the demo pattern (supply_chain_gateway.py). Register 3 targets (2 Lambda + 1 REST API) and build an agent that discovers tools at runtime.
 
 ## Setup
 
-1. Copy the env template:
+1. Copy the env template and paste credentials from the "Load AWS Credentials" sidebar:
    ```bash
    cp .env.example .env
    ```
-2. If you already deployed the stack while doing the starter (`lesson-11-exercise-gateway`), you don't need to deploy again — copy your starter `.env` values into this one. Otherwise:
+2. Deploy the Lambda backends and AgentCore Gateway role:
    ```bash
    python infrastructure/deploy_stack.py
    ```
-3. Copy the printed `AGENTCORE_ROLE_ARN` value into your `.env` (or reuse from your starter `.env`).
+3. Copy the printed `AGENTCORE_ROLE_ARN` value into your `.env`.
 
-## Architecture
-- **Gateway:** SimulatedGateway with 3 registered targets
-- **Targets:** Weather Lambda, Currency Lambda, News REST API
-- **Agent:** AnalyticsAgent discovers and invokes tools via Gateway
+## Your Task
+Complete **9 TODOs** in `analytics_gateway.py`:
 
-## Test Cases (3 queries)
-| Query | Expected Tool | Description |
-|-------|--------------|-------------|
-| Weather in Tokyo | weather_lambda | Routes to Weather Lambda |
-| Convert 500 USD to EUR | currency_lambda | Routes to Currency Lambda |
-| Latest AI news | news_api | Routes to News REST API |
+### Agent TODOs (6)
+| TODO | What to implement | Hint |
+|------|-------------------|------|
+| TODO 1 | BedrockModel | NOVA_LITE_MODEL, temperature=0.1 |
+| TODO 2 | System prompt with Gateway tools | Use gateway.discover_tools() |
+| TODO 3 | Weather @tool function | gateway.invoke_tool("weather_lambda", ...) |
+| TODO 4 | Currency @tool function | gateway.invoke_tool("currency_lambda", ...) |
+| TODO 5 | News @tool function (write from scratch) | Full @tool definition + gateway call |
+| TODO 6 | Return Agent | Agent(model, system_prompt, tools=[...]) |
+
+### Gateway TODOs (3)
+| TODO | What to implement | Hint |
+|------|-------------------|------|
+| TODO 7 | Register 3 targets on Gateway | register_target() for each API |
+| TODO 8 | Run test queries through agent | run_agent_with_retry loop |
+| TODO 9 | Dynamic 4th tool registration | Register stock_price, rebuild agent, test |
+
+## What's Already Done
+- SimulatedGateway class (fully implemented)
+- All 3 API handler functions (weather, currency, news)
+- Test queries with expected tools
+- Main function skeleton with output formatting
+- Helper functions (clean_response, run_agent_with_retry)
+
+## Expected Results
+- Query 1: Weather in Tokyo → Weather Lambda invoked
+- Query 2: Convert 500 USD to EUR → Currency Lambda invoked
+- Query 3: AI news headlines → News REST API invoked
+- Gateway invocation log shows all 3 tools called
 
 ## Running
 ```bash
@@ -40,8 +61,3 @@ python analytics_gateway.py
 ```bash
 aws cloudformation delete-stack --stack-name lesson-11-exercise-gateway
 ```
-
-## Key Differences from Demo
-- **Mixed targets** — 2 Lambda + 1 REST API (vs all REST in demo)
-- **Analytics domain** — weather, currency, news instead of supply chain
-- **Semantic routing focus** — agent must correctly match query to tool
